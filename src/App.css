@@ -1,0 +1,822 @@
+.app {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 16px 20px 60px;
+}
+
+/* ---------- header ---------- */
+.app-header h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.app-header__sub {
+  margin: 4px 0 16px;
+  color: var(--text-sub);
+}
+
+/* ---------- panels ---------- */
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.panel__title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-sub);
+}
+
+/* ---------- collapsible panel ---------- */
+.panel--collapsible {
+  padding: 0;
+}
+
+.panel__summary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-sub);
+}
+
+.panel__summary::-webkit-details-marker {
+  display: none;
+}
+
+.panel__summary::before {
+  content: '▸';
+  font-size: 11px;
+  transition: transform 0.15s;
+}
+
+.panel--collapsible[open] > .panel__summary::before {
+  transform: rotate(90deg);
+}
+
+.panel__summary:hover {
+  color: var(--accent);
+}
+
+.panel__summary-hint {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--text-sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel__body {
+  padding: 2px 16px 12px;
+}
+
+.panel__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: flex-end;
+}
+
+/* ---------- form fields ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.field__label {
+  font-size: 11px;
+  color: var(--text-sub);
+}
+
+.field input[type='number'],
+.field input[type='search'],
+.field select {
+  width: 170px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #fff;
+}
+
+.field--checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 4px;
+}
+
+.rate-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rate-row input[type='number'] {
+  width: 100px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #fff;
+}
+
+.rate-row input[type='number']:disabled {
+  background: #f0f1f4;
+  color: var(--text-sub);
+}
+
+.rate-row__auto {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.field__note {
+  font-size: 11px;
+  color: var(--best);
+}
+
+.field__note--error {
+  color: var(--warning-tag-text);
+}
+
+/* ---------- uploaders ---------- */
+.upload-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.uploader__label {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.uploader__status {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.uploader__loaded {
+  color: var(--best);
+  font-weight: 600;
+}
+
+.uploader__empty {
+  color: var(--text-sub);
+}
+
+.uploader__errors {
+  font-size: 11px;
+  color: var(--caution);
+  max-width: 380px;
+}
+
+.uploader__errors ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.uploader--sample {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+/* ---------- buttons ---------- */
+.btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: #1a4fd6;
+  color: #fff;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+/* ---------- summary cards ---------- */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.summary-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.summary-card__label {
+  font-size: 11px;
+  color: var(--text-sub);
+}
+
+.summary-card__value {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-card__sub {
+  font-size: 11px;
+  color: var(--text-sub);
+}
+
+.summary-card--emphasis .summary-card__value {
+  color: var(--best);
+}
+
+/* ---------- result table ---------- */
+.table-wrapper {
+  overflow-x: auto;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.result-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 1250px;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-table th,
+.result-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.result-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f0f1f4;
+  font-size: 11px;
+  color: var(--text-sub);
+  z-index: 1;
+}
+
+.result-table .num {
+  text-align: right;
+}
+
+.result-table tbody tr:hover {
+  background: #f7f9ff;
+}
+
+.row--negative {
+  opacity: 0.45;
+}
+
+.cell-name {
+  font-weight: 600;
+}
+
+.cell-profit {
+  font-weight: 700;
+}
+
+.cell-profit--strong {
+  color: var(--best);
+  background: var(--best-bg);
+}
+
+.cell-profit--negative {
+  color: var(--excluded);
+  font-weight: 400;
+}
+
+.cell-credit {
+  color: var(--text-sub);
+}
+
+.cell-warnings {
+  white-space: normal;
+  max-width: 260px;
+}
+
+.cell-note {
+  white-space: normal;
+  max-width: 200px;
+  color: var(--text-sub);
+}
+
+/* ---------- judgement badge ---------- */
+.judgement {
+  display: inline-block;
+  min-width: 26px;
+  text-align: center;
+  border-radius: 5px;
+  font-weight: 700;
+  padding: 1px 6px;
+}
+
+.judgement--best {
+  color: var(--best);
+  background: var(--best-bg);
+}
+
+.judgement--good {
+  color: var(--good);
+  background: var(--good-bg);
+}
+
+.judgement--caution {
+  color: var(--caution);
+  background: var(--caution-bg);
+}
+
+.judgement--excluded {
+  color: var(--excluded);
+  background: var(--excluded-bg);
+}
+
+/* ---------- warnings / misc ---------- */
+.warning-tag {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--warning-tag-text);
+  background: var(--warning-tag-bg);
+  border: 1px solid var(--warning-tag-border);
+  border-radius: 4px;
+  padding: 0 5px;
+  margin: 1px 3px 1px 0;
+}
+
+.table-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-sub);
+  background: var(--panel-bg);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+/* ---------- data status ---------- */
+.data-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  align-items: center;
+}
+
+.data-status__badge {
+  font-weight: 700;
+  color: var(--best);
+}
+
+.data-status__badge--stale {
+  color: var(--caution);
+}
+
+.data-status__counts {
+  color: var(--text-sub);
+}
+
+.data-status__loading {
+  margin: 0;
+  color: var(--text-sub);
+}
+
+.data-status__error {
+  margin: 0;
+  color: var(--warning-tag-text);
+  font-weight: 700;
+}
+
+.data-status__hint {
+  margin: 6px 0 0;
+  color: var(--text-sub);
+}
+
+.data-status__hint code {
+  background: #f0f1f4;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.data-status__warnings {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--caution);
+}
+
+.panel--error {
+  border-color: var(--warning-tag-border);
+  background: var(--warning-tag-bg);
+}
+
+.table-notice {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--caution);
+  background: var(--caution-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.result-table a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: #b9c6e8;
+  text-underline-offset: 2px;
+}
+
+.result-table a:hover {
+  color: var(--accent);
+}
+
+/* ---------- page nav ---------- */
+.app-nav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.app-nav__link {
+  padding: 5px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+  color: var(--text-sub);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.app-nav__link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.app-nav__link--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ---------- price tracker ---------- */
+.tracker-set-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.tracker-set-tab {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-bg);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.tracker-set-tab:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tracker-set-tab--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* トラッカー表はセット列をカード名の下に収納した6列構成なので、
+   利益チェッカー用の min-width を外して横スクロールなしで収める */
+.tracker-table {
+  min-width: 0;
+}
+
+.tracker-table th,
+.tracker-table td {
+  padding: 6px 8px;
+}
+
+/* 「Card Kingdom」など複数語のヘッダーは折り返して列幅を抑える */
+.tracker-table th {
+  white-space: normal;
+}
+
+.tracker-th-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: baseline;
+}
+
+.tracker-th-currency {
+  margin-left: 4px;
+  font-weight: 400;
+  color: var(--text-sub);
+}
+
+.tracker-row {
+  cursor: pointer;
+}
+
+.tracker-row--expanded td {
+  background: #f0f4ff;
+}
+
+/* .result-table td の nowrap より詳細度を上げて、長いカード名（SLDの両面カード等）を
+   折り返し、価格列の幅を確保する */
+.result-table td.tracker-card-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 180px;
+  font-weight: 600;
+  white-space: normal;
+}
+
+.tracker-card-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tracker-card-sub {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-sub);
+  white-space: nowrap;
+}
+
+.tracker-foil {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: #ede6ff;
+  color: #6b3fd4;
+  font-weight: 600;
+}
+
+.tracker-thumb {
+  width: 34px;
+  height: 47px;
+  object-fit: cover;
+  border-radius: 3px;
+  flex: none;
+  transition: transform 0.12s;
+}
+
+.tracker-row:hover .tracker-thumb {
+  transform: scale(3.4);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  position: relative;
+  z-index: 5;
+}
+
+.tracker-na {
+  color: var(--excluded);
+}
+
+/* 価格セルの2行目（変動率・在庫数）。横幅を抑えるため価格の下にまとめる */
+.tracker-cell-sub {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  font-size: 10px;
+}
+
+.tracker-change {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.tracker-change--up {
+  color: #0a7d33;
+}
+
+.tracker-change--down {
+  color: #b3261e;
+}
+
+.tracker-stock {
+  font-size: 10px;
+  color: var(--text-sub);
+}
+
+.tracker-expand-hint {
+  font-size: 11px;
+  color: var(--text-sub);
+  white-space: nowrap;
+}
+
+.tracker-chart-row td {
+  background: #fafbff;
+  padding: 12px 18px 16px;
+}
+
+.price-chart svg {
+  width: 100%;
+  max-width: 860px;
+  height: auto;
+  display: block;
+}
+
+.chart-axis-text {
+  font-size: 10px;
+  fill: var(--text-sub);
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.chart-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-legend__item strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-legend__swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.chart-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--text-sub);
+}
+
+.chart-empty {
+  margin: 4px 0;
+  color: var(--text-sub);
+}
+
+.tracker-cond {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--caution-bg);
+  color: var(--caution);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* ==== マーケットウォッチ固有 ==== */
+
+.watch-row--inactive {
+  opacity: 0.62;
+}
+
+.watch-inactive-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--text-sub);
+  font-size: 11px;
+}
+
+.watch-lang {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+}
+
+.watch-profit {
+  font-weight: 700;
+  color: #15803d;
+}
+
+.watch-profit--minus {
+  color: #b91c1c;
+}
+
+.watch-caution {
+  color: #b45309;
+  font-size: 11px;
+  cursor: help;
+}
+
+/* ==== 急上昇ピックアップ ==== */
+
+.watch-surge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.watch-surge-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-bg, #fff);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.watch-surge-chip:hover {
+  border-color: #15803d;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.watch-surge-chip img {
+  width: 34px;
+  border-radius: 3px;
+}
+
+.watch-surge-chip__body {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+
+.watch-surge-chip__name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.watch-surge-chip__sub {
+  color: var(--text-sub);
+  font-size: 11px;
+}
+
+.watch-surge-chip__price {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 12px;
+}
+
+.watch-surge-chip__price strong {
+  font-size: 12px;
+}
+
+.watch-surge-more {
+  margin: 8px 0 0;
+  color: var(--text-sub);
+  font-size: 12px;
+}
