@@ -96,13 +96,13 @@ launchctl kickstart gui/$(id -u)/com.nojimay.mtg-market-watch
 
 本番: <https://mtg-market-watch.pages.dev>
 
-- `main` への push をトリガーに GitHub Actions
-  （`.github/workflows/update-and-deploy.yml`）がビルドして Cloudflare Pages にデプロイします
+- **Cloudflare Pages の Git連携**を使用（mtg-profit-checker の GitHub Actions 方式とは異なり、
+  APIトークンや Secrets の登録が不要）。`main` への push を Cloudflare が直接検知して
+  ビルド（`npm run build` → `dist`、環境変数 `NODE_VERSION=24`）・デプロイします
 - 価格データはローカルの launchd（毎朝8:30）が取得し、`scripts/update-all.mjs` が
   自動で commit & push → そのままデプロイまで流れます
-- 手動デプロイは GitHub の Actions タブから `update-and-deploy` を Run workflow
-- 必要な Secrets: `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`
-  （mtg-profit-checker と同じ値を Settings > Secrets and variables > Actions に登録）
+- 手動デプロイは Cloudflare ダッシュボード > Workers & Pages > mtg-market-watch から
+  「Retry deployment」、またはコードを push するだけです
 
 ## 画面
 
