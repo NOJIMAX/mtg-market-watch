@@ -42,15 +42,18 @@ npm run dev      # http://localhost:5174
 
 ### セット単位の監視リスト
 
-`INCLUDED_SETS` に Scryfall セットコードを指定すると、**ヒット判定と無関係に**そのセットの
-全カードを監視リストに含めます（UI では青い「セット監視」バッジ）。`sld:20` のように
-`:数値` を付けると Scryfall 参考価格（USD）がその値以上のカードだけを対象にします
-（一度追跡したカードは下回っても継続）。追跡する仕上げは通常版優先・Foilのみのセットは Foil。
-恒久設定はスクリプトの `DEFAULT_INCLUDED_SETS` を編集してください。
+**ヒット判定と無関係に**指定セットの全カードを監視リストに含めます
+（UI では青い「セット監視」バッジ）。恒久設定はスクリプトの `DEFAULT_INCLUDED_SETS`：
 
-```bash
-INCLUDED_SETS=exp,mps,sld:20 npm run update:data
-```
+| 指定 | 対象 |
+| --- | --- |
+| EXP / MPS / MP2 | 全カード（Foilのみのセットなので Foil を追跡） |
+| SLD / LTC / FIC / SOA | Scryfall 参考価格 **$20以上**のカードのみ |
+| `is:doublerainbow` | Double Rainbow Foil（セット横断・$20以上） |
+
+`minUsd` 指定は「一度追跡したカードは下回っても継続」。セットコードのほか、
+`query`（Scryfall 検索クエリ）でセット横断の特殊仕上げも指定できます。
+一時的な上書きは環境変数で: `INCLUDED_SETS=exp,sld:20 npm run update:data`
 
 ### 各カードの取得内容
 

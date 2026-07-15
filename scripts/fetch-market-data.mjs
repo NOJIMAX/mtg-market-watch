@@ -62,19 +62,32 @@ const EXCLUDED_SETS = new Set(
 
 /**
  * セット単位の監視リストのデフォルト。ヒット判定と無関係に常に追跡する。
- * 形式: "exp,mps,sld:20" — ":数値" を付けると Scryfall 参考価格(USD)がその値以上の
- * カードだけを対象にする（一度追跡したカードは下回っても継続）。
+ *   code:   Scryfall セットコード（セット全カードが対象）
+ *   query:  Scryfall 検索クエリ（セット横断の特殊仕上げ等。label はログ・警告表示用）
+ *   minUsd: Scryfall 参考価格(USD)がこの値以上のカードだけを対象にする
+ *           （一度追跡したカードは下回っても継続）
+ * 環境変数 INCLUDED_SETS（"exp,sld:20" 形式・code のみ）を指定するとこちらを上書きする。
  */
-const DEFAULT_INCLUDED_SETS = '';
+const DEFAULT_INCLUDED_SETS = [
+  { code: 'exp' }, // Zendikar Expeditions
+  { code: 'mps' }, // Kaladesh Inventions
+  { code: 'mp2' }, // Amonkhet Invocations
+  { code: 'sld', minUsd: 20 }, // Secret Lair Drop
+  { code: 'ltc', minUsd: 20 }, // Tales of Middle-earth Commander
+  { code: 'fic', minUsd: 20 }, // Final Fantasy Commander
+  { code: 'soa', minUsd: 20 }, // Secrets of Strixhaven Mystical Archive
+  { query: 'is:doublerainbow', label: 'doublerainbow', minUsd: 20 }, // Double Rainbow Foil
+];
 
-const INCLUDED_SETS = (process.env.INCLUDED_SETS ?? DEFAULT_INCLUDED_SETS)
-  .split(',')
-  .map((s) => s.trim().toLowerCase())
-  .filter(Boolean)
-  .map((s) => {
-    const [code, min] = s.split(':');
-    return { code, minUsd: min ? Number(min) : null };
-  });
+const INCLUDED_SETS = process.env.INCLUDED_SETS
+  ? process.env.INCLUDED_SETS.split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean)
+      .map((s) => {
+        const [code, min] = s.split(':');
+        return { code, minUsd: min ? Number(min) : null };
+      })
+  : DEFAULT_INCLUDED_SETS;
 
 const USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
@@ -96,12 +109,22 @@ async function fetchWithRetry(url, { headers = {}, retries = 5, method, body, as
         headers: { 'User-Agent': USER_AGENT, ...headers },
       });
       if (res.status === 404) throw new NotFoundError(`HTTP 404: ${url}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const err = new Error(`HTTP ${res.status}`);
+        err.status = res.status;
+        // レート制限は Retry-After 秒（なければ後述の長め待機）を尊重する
+        err.retryAfterSec = Number(res.headers.get('retry-after')) || null;
+        throw err;
+      }
       return as === 'text' ? await res.text() : await res.json();
     } catch (err) {
       if (err instanceof NotFoundError || attempt >= retries) throw err;
-      console.warn(`  retry ${attempt}/${retries}: ${url} (${err.message})`);
-      await sleep(5000 * attempt);
+      const delayMs =
+        err.status === 429
+          ? (err.retryAfterSec ? err.retryAfterSec * 1000 : 30000 * attempt)
+          : 5000 * attempt;
+      console.warn(`  retry ${attempt}/${retries}: ${url} (${err.message}, ${Math.round(delayMs / 1000)}秒待機)`);
+      await sleep(delayMs);
     }
   }
 }
@@ -382,12 +405,13 @@ function cardFromScryfall(c, finish) {
  * 既にヒットとして追跡中のカードには watchSet フラグだけ付ける。
  */
 async function addWatchedSets(cards, prevCards) {
-  for (const { code, minUsd } of INCLUDED_SETS) {
-    if (EXCLUDED_SETS.has(code)) {
+  for (const { code, query, label, minUsd } of INCLUDED_SETS) {
+    const name = label ?? code;
+    if (code && EXCLUDED_SETS.has(code)) {
       warnings.push(`セット監視: ${code} は EXCLUDED_SETS に含まれるためスキップします`);
       continue;
     }
-    let url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(`e:${code}`)}&unique=prints&order=set`;
+    let url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query ?? `e:${code}`)}&unique=prints&order=set`;
     let total = 0;
     let added = 0;
     try {
@@ -395,6 +419,8 @@ async function addWatchedSets(cards, prevCards) {
         const json = await fetchWithRetry(url);
         for (const c of json.data) {
           total++;
+          // クエリ指定でヒットしたカードにも除外セットを適用する
+          if (EXCLUDED_SETS.has(c.set)) continue;
           const finish = c.finishes?.includes('nonfoil')
             ? 'nonfoil'
             : c.finishes?.includes('foil')
@@ -435,10 +461,10 @@ async function addWatchedSets(cards, prevCards) {
         await sleep(150);
       }
       console.log(
-        `セット監視: ${code.toUpperCase()} ${total}枚中 ${added}枚を追加${minUsd != null ? `（参考価格 $${minUsd}以上）` : ''}`,
+        `セット監視: ${name.toUpperCase()} ${total}枚中 ${added}枚を追加${minUsd != null ? `（参考価格 $${minUsd}以上）` : ''}`,
       );
     } catch (err) {
-      warnings.push(`セット監視: ${code} の取得に失敗しました (${err.message})`);
+      warnings.push(`セット監視: ${name} の取得に失敗しました (${err.message})`);
     }
   }
 }
