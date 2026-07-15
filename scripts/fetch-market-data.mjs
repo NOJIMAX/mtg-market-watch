@@ -725,7 +725,9 @@ async function fetchHareruyaRetail(card) {
     try {
       const rows = parseDetailConditions(await fetchWithRetry(detailUrl, { as: 'text' }));
       for (const row of rows) {
-        if (row.stock > 0) candidates.push({ ...row, product });
+        // 他ソース（TCGplayer/CK/Cardmarket）が英語版の価格なので、
+        // 晴れる屋も英語版の在庫だけを参照して言語を統一する
+        if (row.stock > 0 && row.language === 'EN') candidates.push({ ...row, product });
       }
     } catch (err) {
       warnings.push(`晴れる屋: 商品ページの取得に失敗しました: ${detailUrl} (${err.message})`);

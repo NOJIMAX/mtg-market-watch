@@ -64,7 +64,7 @@ npm run dev      # http://localhost:5174
 | --- | --- |
 | 版の特定 | Scryfall（セットコード + コレクター番号 → `tcgplayer_id` 等。結果は `data/resolve-cache.json` にキャッシュ） |
 | TCGplayer 市場価格履歴 | `infinite-api.tcgplayer.com/price/history/{productId}/detailed`。英語・追跡仕上げ・最良状態（NM優先）のSKUのマーケットプライス。初回は annual（週次・1年分）、以降は month（日次・30日分）を取得して日付単位でマージ蓄積 |
-| 晴れる屋 販売 (JPY) | `unisearch_api` のカード名検索（`kw=`）→ セット・Foil・番号で商品を特定 → 商品ページの状態別在庫から「在庫のある最良状態（NM優先）の最安値」 |
+| 晴れる屋 販売 (JPY) | `unisearch_api` のカード名検索（`kw=`）→ セット・Foil・番号で商品を特定 → 商品ページの状態別在庫から「在庫のある最良状態（NM優先）の最安値」。他ソースと言語を揃えるため**英語版の在庫のみ**参照（日本語版しか在庫がない場合は「在庫なし」扱い） |
 | Card Kingdom 販売 (USD) | 公開API `api.cardkingdom.com/api/pricelist` の `price_retail`（scryfall_id + Foil有無で照合） |
 | Cardmarket (EUR) | Scryfall `/cards/collection` の `prices.eur / eur_foil` |
 | 晴れる屋 買取 (JPY) / CK Buylist (USD) | 利益チェッカーの出力をそのまま利用（追加リクエストなし） |
