@@ -37,8 +37,8 @@ npm run dev      # http://localhost:5174
 のカードを実質利益の高い順に `WATCH_MAX` 枚（既定 300）まで追跡対象にします。
 **一度追跡したカードはヒットから外れても履歴を継続**します（UI では「ヒット外」表示）。
 
-`EXCLUDED_SETS`（既定 `30a` = 30th Anniversary Edition）に指定したセットは追跡対象外です。
-過去に追跡していたカードも次回実行時にカタログ・履歴から取り除かれます。
+`EXCLUDED_SETS`（既定 `30a,7ed` = 30th Anniversary Edition と Seventh Edition）に指定した
+セットは追跡対象外です。過去に追跡していたカードも次回実行時にカタログ・履歴から取り除かれます。
 
 ### セット単位の監視リスト
 
@@ -48,12 +48,15 @@ npm run dev      # http://localhost:5174
 | 指定 | 対象 |
 | --- | --- |
 | EXP / MPS / MP2 | 全カード（Foilのみのセットなので Foil を追跡） |
-| SLD / LTC / FIC / SOA | Scryfall 参考価格 **$20以上**のカードのみ |
+| SLD | Scryfall 参考価格 **$30以上**・**基本地形を除く**（`e:sld -t:basic`） |
+| LTC / FIC / SOA | Scryfall 参考価格 **$20以上** |
 | `is:doublerainbow` | Double Rainbow Foil（セット横断・$20以上） |
 
-`minUsd` 指定は「一度追跡したカードは下回っても継続」。セットコードのほか、
-`query`（Scryfall 検索クエリ）でセット横断の特殊仕上げも指定できます。
-一時的な上書きは環境変数で: `INCLUDED_SETS=exp,sld:20 npm run update:data`
+セット監視のカードは条件（しきい値・クエリ）から外れると次回実行時にカタログからも
+外れます（再び条件を満たせば TCGplayer 履歴は過去1年分を取り直せるため実害なし）。
+ヒット経験のあるカードは従来どおり「ヒット外」として履歴を継続します。
+セットコードのほか `query`（Scryfall 検索クエリ）でセット横断の特殊仕上げも指定できます。
+一時的な上書きは環境変数で: `INCLUDED_SETS=exp,sld:30 npm run update:data`
 
 ### 各カードの取得内容
 

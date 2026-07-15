@@ -51,10 +51,11 @@ const DELAY_MS = Number(process.env.WATCH_DELAY_MS ?? 600);
 /**
  * 追跡対象外のセット（Scryfall/晴れる屋どちらのコードでも判定できるよう小文字で保持）。
  * 30A (30th Anniversary Edition) は再録プロキシ的な特別商品で通常の相場と乖離するため除外。
+ * 7ED (Seventh Edition) はユーザー指定で除外。
  * 既に追跡済みのカードもここに追加すると次回実行時にカタログから外れる。
  */
 const EXCLUDED_SETS = new Set(
-  (process.env.EXCLUDED_SETS ?? '30a')
+  (process.env.EXCLUDED_SETS ?? '30a,7ed')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean),
@@ -64,15 +65,16 @@ const EXCLUDED_SETS = new Set(
  * セット単位の監視リストのデフォルト。ヒット判定と無関係に常に追跡する。
  *   code:   Scryfall セットコード（セット全カードが対象）
  *   query:  Scryfall 検索クエリ（セット横断の特殊仕上げ等。label はログ・警告表示用）
- *   minUsd: Scryfall 参考価格(USD)がこの値以上のカードだけを対象にする
- *           （一度追跡したカードは下回っても継続）
+ *   minUsd: Scryfall 参考価格(USD)がこの値以上のカードだけを対象にする。
+ *           条件から外れたカードは次回実行時にカタログからも外れる
+ *           （再び条件を満たせば TCGplayer 履歴は過去1年分を取り直せる）
  * 環境変数 INCLUDED_SETS（"exp,sld:20" 形式・code のみ）を指定するとこちらを上書きする。
  */
 const DEFAULT_INCLUDED_SETS = [
   { code: 'exp' }, // Zendikar Expeditions
   { code: 'mps' }, // Kaladesh Inventions
   { code: 'mp2' }, // Amonkhet Invocations
-  { code: 'sld', minUsd: 20 }, // Secret Lair Drop
+  { query: 'e:sld -t:basic', label: 'sld', minUsd: 30 }, // Secret Lair Drop（基本地形を除く）
   { code: 'ltc', minUsd: 20 }, // Tales of Middle-earth Commander
   { code: 'fic', minUsd: 20 }, // Final Fantasy Commander
   { code: 'soa', minUsd: 20 }, // Secrets of Strixhaven Mystical Archive
@@ -390,6 +392,8 @@ function cardFromScryfall(c, finish) {
     img: c.image_uris?.normal ?? c.card_faces?.[0]?.image_uris?.normal ?? '',
     scryfallUri: c.scryfall_uri,
     tid: c.tcgplayer_id ?? null,
+    // Double Rainbow Foil（シリアル入り）。晴れる屋の商品照合で参照先の区別に使う
+    ...(c.promo_types?.includes('doublerainbow') && { dr: true }),
     cmEur: toNum(foil ? (c.prices?.eur_foil ?? c.prices?.eur) : (c.prices?.eur ?? c.prices?.eur_foil)),
     urls: {
       tp: c.purchase_uris?.tcgplayer ?? '',
@@ -401,8 +405,8 @@ function cardFromScryfall(c, finish) {
 /**
  * INCLUDED_SETS のセット全カードを監視リストに追加する（ヒット判定と無関係）。
  * 追跡する仕上げは通常版優先（Foilのみのセットは Foil）。minUsd 指定時は
- * Scryfall 参考価格で選別するが、一度追跡したカードは下回っても継続する。
- * 既にヒットとして追跡中のカードには watchSet フラグだけ付ける。
+ * Scryfall 参考価格で選別する。既にヒットとして追跡中のカードには
+ * watchSet フラグだけ付ける。
  */
 async function addWatchedSets(cards, prevCards) {
   for (const { code, query, label, minUsd } of INCLUDED_SETS) {
@@ -438,7 +442,7 @@ async function addWatchedSets(cards, prevCards) {
               ? (c.prices?.usd_foil ?? c.prices?.usd_etched ?? c.prices?.usd)
               : (c.prices?.usd ?? c.prices?.usd_foil),
           );
-          if (minUsd != null && (refUsd ?? 0) < minUsd && !prevCards.has(id)) continue;
+          if (minUsd != null && (refUsd ?? 0) < minUsd) continue;
           cards.set(id, {
             id,
             ...cardFromScryfall(c, finish),
@@ -656,6 +660,9 @@ function parseDetailConditions(html) {
  */
 const HY_SET_LABEL_ALIAS = { MP2: 'MPS' };
 
+/** ダブルレインボウ（シリアル入り）商品の商品名マーカー */
+const HY_DR_MARKER = /ダブルレインボウ|シリアル|serial|【DR/i;
+
 function parseHyProductName(name) {
   const set = name.match(/\[([0-9A-Za-z-]+)\]/);
   const cn = name.match(/\((\d+[a-z]?)\)/i);
@@ -692,6 +699,12 @@ async function fetchHareruyaRetail(card) {
   const products = new Set();
   for (const doc of docs) {
     if ((doc.foil_flg === '1') !== wantFoil) continue;
+    // ダブルレインボウ版は晴れる屋では「【ダブルレインボウ・Foil】(136)《...》(シリアル入り)」
+    // のようにマーカー付き・番号は z なしで出品されるため、マーカーの有無で対応付ける
+    // （DRカードはマーカー付き商品のみ、通常カードはマーカー付き商品を除外）
+    if (HY_DR_MARKER.test(`${doc.product_name ?? ''} ${doc.product_name_en ?? ''}`) !== !!card.dr) {
+      continue;
+    }
     const docName = normalizeCardName(doc.card_name ?? '');
     if (docName && !wantName.split(' // ').some((f) => f === docName) && docName !== wantName) {
       continue;
@@ -699,7 +712,8 @@ async function fetchHareruyaRetail(card) {
     const parsed = parseHyProductName(doc.product_name_en || doc.product_name || '');
     if (parsed.set !== wantSet && parsed.set !== HY_SET_LABEL_ALIAS[wantSet]) continue;
     // 同一セットに同名の別版がある場合に備え、番号が両方わかるときだけ番号でも絞る
-    if (parsed.cn && wantCn && parsed.cn !== wantCn) continue;
+    // （DR版のScryfall番号は「136z」だが商品名は「(136)」なので末尾の英字を無視して比較）
+    if (parsed.cn && wantCn && parsed.cn.replace(/\D+$/, '') !== wantCn) continue;
     products.add(doc.product);
     if (products.size >= 3) break; // 詳細ページの取得は3商品まで
   }
@@ -881,6 +895,9 @@ async function main() {
     if (cards.has(id)) continue;
     // 除外セットに指定されたカードは過去に追跡していてもカタログから外す
     if (EXCLUDED_SETS.has((prev.set ?? '').toLowerCase())) continue;
+    // セット監視のみで追跡していたカードは、条件（しきい値・クエリ・設定削除）から
+    // 外れたらカタログからも外す。ヒット経験のあるカードは「ヒット外」として残す
+    if (prev.watchSet && !prev.active) continue;
     const stale = hitById.get(id);
     cards.set(id, {
       ...prev,
