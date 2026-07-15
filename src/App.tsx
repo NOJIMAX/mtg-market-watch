@@ -212,7 +212,7 @@ export default function App() {
     if (!catalog) return [];
     const search = searchText.trim().toLowerCase();
     const filtered = catalog.cards.filter((c) => {
-      if (activeOnly && !c.active) return false;
+      if (activeOnly && !c.active && !c.watchSet) return false;
       if (foilFilter !== 'all' && (c.finish !== 'nonfoil') !== (foilFilter === 'foil')) return false;
       if (setFilter && c.set !== setFilter) return false;
       if (search && !`${c.name} ${c.setName} ${c.set}`.toLowerCase().includes(search)) return false;
@@ -317,7 +317,9 @@ export default function App() {
             {isStale && '（データが古い可能性があります）'}
           </span>
           <span className="data-status__counts">
-            追跡 {catalog.counts.cards}枚（ヒット中 {catalog.counts.active}枚）/ TCG履歴{' '}
+            追跡 {catalog.counts.cards}枚（ヒット中 {catalog.counts.active}枚
+            {(catalog.counts.watchSet ?? 0) > 0 && `・セット監視 ${catalog.counts.watchSet}枚`}）/
+            TCG履歴{' '}
             {catalog.counts.tcgplayer}枚 / 晴れる屋在庫 {catalog.counts.hareruya}枚 / CK{' '}
             {catalog.counts.cardKingdom}枚 / CM {catalog.counts.cardmarket}枚
           </span>
@@ -470,7 +472,7 @@ export default function App() {
                 <Fragment key={card.id}>
                   <tr
                     id={`row-${card.id}`}
-                    className={`tracker-row${expanded ? ' tracker-row--expanded' : ''}${card.active ? '' : ' watch-row--inactive'}`}
+                    className={`tracker-row${expanded ? ' tracker-row--expanded' : ''}${card.active || card.watchSet ? '' : ' watch-row--inactive'}`}
                     onClick={() => setExpandedId(expanded ? null : card.id)}
                   >
                     <td className="tracker-card-cell">
@@ -492,7 +494,14 @@ export default function App() {
                           {card.language && card.language !== 'English' && (
                             <span className="watch-lang">{card.language}</span>
                           )}
-                          {!card.active && <span className="watch-inactive-badge">ヒット外</span>}
+                          {!card.active &&
+                            (card.watchSet ? (
+                              <span className="watch-inactive-badge watch-set-badge">
+                                セット監視
+                              </span>
+                            ) : (
+                              <span className="watch-inactive-badge">ヒット外</span>
+                            ))}
                         </span>
                       </span>
                     </td>

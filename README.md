@@ -40,6 +40,18 @@ npm run dev      # http://localhost:5174
 `EXCLUDED_SETS`（既定 `30a` = 30th Anniversary Edition）に指定したセットは追跡対象外です。
 過去に追跡していたカードも次回実行時にカタログ・履歴から取り除かれます。
 
+### セット単位の監視リスト
+
+`INCLUDED_SETS` に Scryfall セットコードを指定すると、**ヒット判定と無関係に**そのセットの
+全カードを監視リストに含めます（UI では青い「セット監視」バッジ）。`sld:20` のように
+`:数値` を付けると Scryfall 参考価格（USD）がその値以上のカードだけを対象にします
+（一度追跡したカードは下回っても継続）。追跡する仕上げは通常版優先・Foilのみのセットは Foil。
+恒久設定はスクリプトの `DEFAULT_INCLUDED_SETS` を編集してください。
+
+```bash
+INCLUDED_SETS=exp,mps,sld:20 npm run update:data
+```
+
 ### 各カードの取得内容
 
 | データ | 取得元 |

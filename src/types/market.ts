@@ -14,6 +14,8 @@ export interface WatchCard {
   tid: number | null;
   /** 現在もヒット条件を満たしているか（false = 過去にヒットして履歴継続中） */
   active: boolean;
+  /** INCLUDED_SETS によるセット単位の監視対象（ヒット判定と無関係に追跡） */
+  watchSet?: boolean;
   firstTracked: string;
   /** 晴れる屋側のセットコード（買取行由来） */
   hySetCode: string;
@@ -60,6 +62,8 @@ export interface WatchCatalog {
   counts: {
     cards: number;
     active: number;
+    /** 2026-07-15以前のデータには存在しない */
+    watchSet?: number;
     hareruya: number;
     cardKingdom: number;
     tcgplayer: number;

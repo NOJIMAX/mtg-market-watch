@@ -28,6 +28,8 @@
  *   WATCH_MAX         新規追跡数の上限。実質利益の高い順 (デフォルト 300)
  *   WATCH_DELAY_MS    リクエスト間隔ms (デフォルト 600)
  *   EXCLUDED_SETS     追跡対象外のセットコード（カンマ区切り・デフォルト "30a"）
+ *   INCLUDED_SETS     ヒットと無関係に監視するセット（カンマ区切り。"sld:20" で
+ *                     Scryfall参考価格 $20以上のみ。デフォルトは DEFAULT_INCLUDED_SETS）
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -57,6 +59,22 @@ const EXCLUDED_SETS = new Set(
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean),
 );
+
+/**
+ * セット単位の監視リストのデフォルト。ヒット判定と無関係に常に追跡する。
+ * 形式: "exp,mps,sld:20" — ":数値" を付けると Scryfall 参考価格(USD)がその値以上の
+ * カードだけを対象にする（一度追跡したカードは下回っても継続）。
+ */
+const DEFAULT_INCLUDED_SETS = '';
+
+const INCLUDED_SETS = (process.env.INCLUDED_SETS ?? DEFAULT_INCLUDED_SETS)
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean)
+  .map((s) => {
+    const [code, min] = s.split(':');
+    return { code, minUsd: min ? Number(min) : null };
+  });
 
 const USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
@@ -357,6 +375,74 @@ function cardFromScryfall(c, finish) {
   };
 }
 
+/**
+ * INCLUDED_SETS のセット全カードを監視リストに追加する（ヒット判定と無関係）。
+ * 追跡する仕上げは通常版優先（Foilのみのセットは Foil）。minUsd 指定時は
+ * Scryfall 参考価格で選別するが、一度追跡したカードは下回っても継続する。
+ * 既にヒットとして追跡中のカードには watchSet フラグだけ付ける。
+ */
+async function addWatchedSets(cards, prevCards) {
+  for (const { code, minUsd } of INCLUDED_SETS) {
+    if (EXCLUDED_SETS.has(code)) {
+      warnings.push(`セット監視: ${code} は EXCLUDED_SETS に含まれるためスキップします`);
+      continue;
+    }
+    let url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(`e:${code}`)}&unique=prints&order=set`;
+    let total = 0;
+    let added = 0;
+    try {
+      while (url) {
+        const json = await fetchWithRetry(url);
+        for (const c of json.data) {
+          total++;
+          const finish = c.finishes?.includes('nonfoil')
+            ? 'nonfoil'
+            : c.finishes?.includes('foil')
+              ? 'foil'
+              : (c.finishes?.[0] ?? 'foil');
+          const foil = finish !== 'nonfoil';
+          const id = `${c.id}:${finish}`;
+          const existing = cards.get(id);
+          if (existing) {
+            existing.watchSet = true;
+            continue;
+          }
+          const refUsd = toNum(
+            foil
+              ? (c.prices?.usd_foil ?? c.prices?.usd_etched ?? c.prices?.usd)
+              : (c.prices?.usd ?? c.prices?.usd_foil),
+          );
+          if (minUsd != null && (refUsd ?? 0) < minUsd && !prevCards.has(id)) continue;
+          cards.set(id, {
+            id,
+            ...cardFromScryfall(c, finish),
+            finish,
+            active: false,
+            watchSet: true,
+            firstTracked: prevCards.get(id)?.firstTracked ?? todayJst(),
+            language: 'English',
+            hyBuyJpy: null,
+            hyBuyUrl: '',
+            ckBuylistUsd: null,
+            ckMaxQty: 0,
+            netProfitJpy: null,
+            profitRate: null,
+            cautions: [],
+          });
+          added++;
+        }
+        url = json.has_more ? json.next_page : null;
+        await sleep(150);
+      }
+      console.log(
+        `セット監視: ${code.toUpperCase()} ${total}枚中 ${added}枚を追加${minUsd != null ? `（参考価格 $${minUsd}以上）` : ''}`,
+      );
+    } catch (err) {
+      warnings.push(`セット監視: ${code} の取得に失敗しました (${err.message})`);
+    }
+  }
+}
+
 /** 追跡カードの Cardmarket 価格・画像などを /cards/collection でまとめて更新する */
 async function refreshScryfall(cards) {
   console.log('Scryfall: 追跡カードの最新情報を取得中...');
@@ -537,6 +623,13 @@ function parseDetailConditions(html) {
 }
 
 /** 商品名から [SET] とコレクター番号 (138) を抜き出す */
+/**
+ * 晴れる屋の商品名セット表記の別名。Amonkhet Invocations (MP2) は商品名では
+ * Kaladesh Inventions と同じ [MPS] と表記される（カード名が重複しないため
+ * 名前照合と組み合わせれば誤マッチしない）。
+ */
+const HY_SET_LABEL_ALIAS = { MP2: 'MPS' };
+
 function parseHyProductName(name) {
   const set = name.match(/\[([0-9A-Za-z-]+)\]/);
   const cn = name.match(/\((\d+[a-z]?)\)/i);
@@ -578,7 +671,7 @@ async function fetchHareruyaRetail(card) {
       continue;
     }
     const parsed = parseHyProductName(doc.product_name_en || doc.product_name || '');
-    if (parsed.set !== wantSet) continue;
+    if (parsed.set !== wantSet && parsed.set !== HY_SET_LABEL_ALIAS[wantSet]) continue;
     // 同一セットに同名の別版がある場合に備え、番号が両方わかるときだけ番号でも絞る
     if (parsed.cn && wantCn && parsed.cn !== wantCn) continue;
     products.add(doc.product);
@@ -744,6 +837,9 @@ async function main() {
     console.log(`Scryfall: ${resolveFail}件はScryfallの版に解決できず追跡対象外です`);
   }
 
+  // 4.5 セット指定の監視リストを追加する
+  await addWatchedSets(cards, prevCards);
+
   // 5. 前回追跡していて今回ヒットしなかったカードを active:false で引き継ぐ。
   //    解決済みキャッシュを使って「今回の照合結果のうち同じ版・仕上げの行」を対応付け、
   //    ヒット外でも買取価格・利益は最新化する
@@ -763,6 +859,8 @@ async function main() {
     cards.set(id, {
       ...prev,
       active: false,
+      // セット監視から外れた場合はフラグを落とす（監視中ならこのループに来ない）
+      watchSet: false,
       // 買取価格・利益はヒット外でも照合できた場合のみ更新する
       ...(stale && {
         hyBuyJpy: stale.jp.hareruyaBuyPriceJPY,
@@ -823,6 +921,7 @@ async function main() {
   const counts = {
     cards: trackedCards.length,
     active: trackedCards.filter((c) => c.active).length,
+    watchSet: trackedCards.filter((c) => c.watchSet).length,
     hareruya: trackedCards.filter((c) => c.hyJpy != null).length,
     cardKingdom: trackedCards.filter((c) => c.ckUsd != null).length,
     tcgplayer: trackedCards.filter((c) => c.tpMarketUsd != null).length,
