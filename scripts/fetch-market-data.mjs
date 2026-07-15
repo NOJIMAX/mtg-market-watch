@@ -27,6 +27,7 @@
  *   COND_DOWN_PCT     状態ダウン想定率% (デフォルト 10)
  *   WATCH_MAX         新規追跡数の上限。実質利益の高い順 (デフォルト 300)
  *   WATCH_DELAY_MS    リクエスト間隔ms (デフォルト 600)
+ *   EXCLUDED_SETS     追跡対象外のセットコード（カンマ区切り・デフォルト "30a"）
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -44,6 +45,18 @@ const FX_FEE_RATE = Number(process.env.FX_FEE_PCT ?? 2) / 100;
 const COND_DOWN_RATE = Number(process.env.COND_DOWN_PCT ?? 10) / 100;
 const WATCH_MAX = Number(process.env.WATCH_MAX ?? 300);
 const DELAY_MS = Number(process.env.WATCH_DELAY_MS ?? 600);
+
+/**
+ * 追跡対象外のセット（Scryfall/晴れる屋どちらのコードでも判定できるよう小文字で保持）。
+ * 30A (30th Anniversary Edition) は再録プロキシ的な特別商品で通常の相場と乖離するため除外。
+ * 既に追跡済みのカードもここに追加すると次回実行時にカタログから外れる。
+ */
+const EXCLUDED_SETS = new Set(
+  (process.env.EXCLUDED_SETS ?? '30a')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+);
 
 const USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
@@ -661,8 +674,13 @@ async function main() {
     if (!prev || hit.netProfitJpy > prev.netProfitJpy) hitsByKey.set(key, hit);
   }
   const allHits = [...hitsByKey.values()];
-  const hits = allHits.filter(isHit).sort((a, b) => b.netProfitJpy - a.netProfitJpy);
-  console.log(`照合 ${allHits.length}件中、ヒット ${hits.length}件（上位 ${Math.min(hits.length, WATCH_MAX)}件を追跡対象に）`);
+  const hits = allHits
+    .filter(isHit)
+    .filter((h) => !EXCLUDED_SETS.has(normalizeSetCode(h.jp.setCode).toLowerCase()))
+    .sort((a, b) => b.netProfitJpy - a.netProfitJpy);
+  console.log(
+    `照合 ${allHits.length}件中、ヒット ${hits.length}件（除外セット: ${[...EXCLUDED_SETS].join(',') || 'なし'}・上位 ${Math.min(hits.length, WATCH_MAX)}件を追跡対象に）`,
+  );
 
   // 3. 前回の追跡カードを読み込む（一度追跡したカードは履歴を継続する）
   const prevCatalog = await readJson(join(OUT_DIR, 'cards.json'), { cards: [] });
@@ -739,6 +757,8 @@ async function main() {
   }
   for (const [id, prev] of prevCards) {
     if (cards.has(id)) continue;
+    // 除外セットに指定されたカードは過去に追跡していてもカタログから外す
+    if (EXCLUDED_SETS.has((prev.set ?? '').toLowerCase())) continue;
     const stale = hitById.get(id);
     cards.set(id, {
       ...prev,
@@ -773,11 +793,19 @@ async function main() {
   await writeFile(CACHE_PATH, JSON.stringify(cache));
 
   // 6. 各ソースの価格・履歴を取得する
-  const trackedCards = await refreshScryfall(allCards);
+  // 晴れる屋とScryfallでセットコードが異なる場合に備え、解決後のセットでも除外を適用する
+  const trackedCards = (await refreshScryfall(allCards)).filter(
+    (c) => !EXCLUDED_SETS.has((c.set ?? '').toLowerCase()),
+  );
   await fetchCardKingdomRetail(trackedCards);
 
   const tcgHistory = (await readJson(join(OUT_DIR, 'tcg-history.json'))) ?? {};
   await fetchTcgHistories(trackedCards, tcgHistory);
+  // 追跡から外れたカード（除外セット等）の履歴エントリを掃除する
+  const trackedIds = new Set(trackedCards.map((c) => c.id));
+  for (const id of Object.keys(tcgHistory)) {
+    if (!trackedIds.has(id)) delete tcgHistory[id];
+  }
   // 後続フェーズで失敗しても取得済みの履歴が失われないよう、この時点で保存する
   await mkdir(OUT_DIR, { recursive: true });
   await writeFile(join(OUT_DIR, 'tcg-history.json'), JSON.stringify(tcgHistory));

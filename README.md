@@ -37,6 +37,9 @@ npm run dev      # http://localhost:5174
 のカードを実質利益の高い順に `WATCH_MAX` 枚（既定 300）まで追跡対象にします。
 **一度追跡したカードはヒットから外れても履歴を継続**します（UI では「ヒット外」表示）。
 
+`EXCLUDED_SETS`（既定 `30a` = 30th Anniversary Edition）に指定したセットは追跡対象外です。
+過去に追跡していたカードも次回実行時にカタログ・履歴から取り除かれます。
+
 ### 各カードの取得内容
 
 | データ | 取得元 |
@@ -57,7 +60,7 @@ npm run dev      # http://localhost:5174
 環境変数で調整できます:
 
 ```bash
-MIN_PROFIT_JPY=5000 MIN_RATE_PCT=20 WATCH_MAX=150 npm run update
+MIN_PROFIT_JPY=5000 MIN_RATE_PCT=20 WATCH_MAX=150 EXCLUDED_SETS=30a,sld npm run update
 ```
 
 ### 既知の制限
