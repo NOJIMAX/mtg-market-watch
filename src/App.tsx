@@ -122,6 +122,9 @@ export default function App() {
   const [rates, setRates] = useState<FxRates>(FALLBACK_RATES);
   const [searchText, setSearchText] = useState('');
   const [activeOnly, setActiveOnly] = useState(false);
+  const [foilFilter, setFoilFilter] = useState<'all' | 'foil' | 'nonfoil'>('all');
+  /** 空文字 = 全セット */
+  const [setFilter, setSetFilter] = useState('');
   const [sortKey, setSortKey] = useState<WatchSortKey>('netProfit');
   const [showJpy, setShowJpy] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -169,6 +172,18 @@ export default function App() {
 
   const changes = useMemo(() => buildChanges(history), [history]);
 
+  /** 追跡中カードに存在するセットの選択肢（枚数の多い順） */
+  const setOptions = useMemo(() => {
+    if (!catalog) return [];
+    const bySet = new Map<string, { code: string; name: string; count: number }>();
+    for (const c of catalog.cards) {
+      const entry = bySet.get(c.set) ?? { code: c.set, name: c.setName, count: 0 };
+      entry.count++;
+      bySet.set(c.set, entry);
+    }
+    return [...bySet.values()].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code));
+  }, [catalog]);
+
   /** TCG市場価格が90日で SURGE_MIN_PCT 以上上昇しているカード（上昇率の降順） */
   const surges = useMemo(() => {
     if (!catalog) return [];
@@ -184,6 +199,8 @@ export default function App() {
   const jumpToCard = (id: string) => {
     setSearchText('');
     setActiveOnly(false);
+    setFoilFilter('all');
+    setSetFilter('');
     setExpandedId(id);
     // フィルタ解除後の再描画を待ってからスクロールする
     requestAnimationFrame(() => {
@@ -196,6 +213,8 @@ export default function App() {
     const search = searchText.trim().toLowerCase();
     const filtered = catalog.cards.filter((c) => {
       if (activeOnly && !c.active) return false;
+      if (foilFilter !== 'all' && (c.finish !== 'nonfoil') !== (foilFilter === 'foil')) return false;
+      if (setFilter && c.set !== setFilter) return false;
       if (search && !`${c.name} ${c.setName} ${c.set}`.toLowerCase().includes(search)) return false;
       return true;
     });
@@ -251,7 +270,7 @@ export default function App() {
         break;
     }
     return sorted;
-  }, [catalog, searchText, activeOnly, sortKey, tcg, rates]);
+  }, [catalog, searchText, activeOnly, foilFilter, setFilter, sortKey, tcg, rates]);
 
   if (loading) {
     return (
@@ -370,6 +389,28 @@ export default function App() {
               placeholder="例: Mana Crypt"
               onChange={(e) => setSearchText(e.target.value)}
             />
+          </label>
+          <label className="field">
+            <span className="field__label">セット</span>
+            <select value={setFilter} onChange={(e) => setSetFilter(e.target.value)}>
+              <option value="">すべて（{setOptions.length}セット）</option>
+              {setOptions.map((s) => (
+                <option key={s.code} value={s.code}>
+                  {s.code.toUpperCase()} — {s.name}（{s.count}枚）
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span className="field__label">Foil</span>
+            <select
+              value={foilFilter}
+              onChange={(e) => setFoilFilter(e.target.value as typeof foilFilter)}
+            >
+              <option value="all">すべて</option>
+              <option value="foil">Foilのみ</option>
+              <option value="nonfoil">非Foilのみ</option>
+            </select>
           </label>
           <label className="field">
             <span className="field__label">並び順</span>
