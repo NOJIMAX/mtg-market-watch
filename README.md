@@ -89,11 +89,16 @@ MIN_PROFIT_JPY=5000 MIN_RATE_PCT=20 WATCH_MAX=150 EXCLUDED_SETS=30a,sld npm run 
 - 同一コレクター番号に複数バリアント（NEOのネオンインク等）があるカードは、
   利益チェッカー同様に別バリアントを照合してしまうことがあります（⚠マークの注意事項を確認してください）
 
-## 1日1回の自動実行（launchd）
+## 1日1回の自動実行
 
-毎朝 **8:30**（利益チェッカーの7:00の更新後）に `scripts/update-all.mjs` が自動実行され、
-データ取得後に `public/data` へ変更があれば **git commit & push** します
-（push が本番デプロイをトリガー）。push なしで取得だけしたい場合は `npm run update:data`。
+定期実行の本線は **GitHub Actions**（`.github/workflows/update-data.yml`・毎朝 8:30 JST）です。
+CIが利益チェッカーの価格データをリポジトリから取得（Secret `PROFIT_REPO_TOKEN` が必要）し、
+データ更新 → commit & push → Cloudflare Pages がデプロイまで自動で流れます。
+手動実行は GitHub の Actions タブ > update-data > **Run workflow**（スマホからも可）。
+
+ローカルの launchd（**10:30**）は**フォールバック**です。`update-all.mjs` が git pull 後に
+「今日のデータが既にあるか」を確認し、CIが成功していれば何もしません（`FORCE=1` で強制実行）。
+CIが失敗した日だけローカルで取得して push します。
 
 ### 手動更新
 

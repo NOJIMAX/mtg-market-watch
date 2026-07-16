@@ -11,10 +11,11 @@
 	</array>
 	<key>WorkingDirectory</key>
 	<string>/Users/nojimay/Cloudcode/mtg-market-watch</string>
+	<!-- 定期実行の本線は GitHub Actions (8:30 JST)。これはCIが落ちた日のフォールバック -->
 	<key>StartCalendarInterval</key>
 	<dict>
 		<key>Hour</key>
-		<integer>8</integer>
+		<integer>10</integer>
 		<key>Minute</key>
 		<integer>30</integer>
 	</dict>

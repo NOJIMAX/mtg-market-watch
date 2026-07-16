@@ -1,0 +1,62 @@
+# 毎朝 8:30 JST に価格データを取得して commit & push する（CI版の定期実行）。
+# push は Cloudflare Pages の Git 連携が検知して本番デプロイされる。
+#
+# 必要な Secret（Settings > Secrets and variables > Actions）:
+#   PROFIT_REPO_TOKEN  プライベートの mtg-profit-checker を読むための
+#                      Fine-grained PAT（Repository access: mtg-profit-checker のみ /
+#                      Permissions: Contents = Read-only）
+#
+# ローカルの launchd（10:30）はフォールバック: このワークフローが成功していれば
+# update-all.mjs が「今日のデータは取得済み」と判断してスキップする。
+name: update-data
+
+on:
+  # 手動実行（Actions タブ > update-data > Run workflow。スマホからも可）
+  workflow_dispatch:
+  schedule:
+    # 23:30 UTC = 8:30 JST（利益チェッカーのローカル7:00更新の後）
+    - cron: '30 23 * * *'
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout profit-checker price data
+        uses: actions/checkout@v4
+        with:
+          repository: NOJIMAX/mtg-profit-checker
+          token: ${{ secrets.PROFIT_REPO_TOKEN }}
+          path: profit-repo
+          sparse-checkout: public/prices
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Fetch market data
+        env:
+          PROFIT_DATA_DIR: ${{ github.workspace }}/profit-repo/public/prices
+        run: node scripts/fetch-market-data.mjs
+
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data data/resolve-cache.json
+          if git diff --cached --quiet; then
+            echo "価格データに変更がないため push しません"
+            exit 0
+          fi
+          git commit -m "chore: 価格データ更新 ($(TZ=Asia/Tokyo date +%F) CI)"
+          git pull --rebase origin main
+          git push origin main
