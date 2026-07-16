@@ -1,0 +1,21 @@
+# GitHub Actions のIPから各データソースにアクセスできるかの検証用ワークフロー。
+# 手動実行専用（Actions タブ > probe-sources > Run workflow）。
+# 全ソース到達可能なら、データ取得のCI移行を検討できる。
+name: probe-sources
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Probe data sources
+        run: node scripts/probe-sources.mjs
