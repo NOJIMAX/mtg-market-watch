@@ -95,6 +95,14 @@ MIN_PROFIT_JPY=5000 MIN_RATE_PCT=20 WATCH_MAX=150 EXCLUDED_SETS=30a,sld npm run 
 データ取得後に `public/data` へ変更があれば **git commit & push** します
 （push が本番デプロイをトリガー）。push なしで取得だけしたい場合は `npm run update:data`。
 
+### 手動更新
+
+- **ローカルの画面から**: `npm run dev` 中は「最終更新」の横に**「今すぐ更新」ボタン**が
+  表示されます（Vite開発サーバーの `/api/update` エンドポイント経由で `update-all.mjs` を
+  起動。実行中は進捗をポーリング表示し、完了すると画面のデータを自動再読込）。
+  本番サイトにはエンドポイントが無いためボタンは表示されません
+- **ターミナルから**: `npm run update`（push込み）/ `npm run update:data`（取得のみ）
+
 - 定義ファイル: `launchd/com.nojimay.mtg-market-watch.plist`
 - ログ: `logs/update.log`
 - スリープしていた場合は復帰後に実行されます（ログアウト中は実行されません）

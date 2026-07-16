@@ -825,3 +825,44 @@
   color: var(--text-sub);
   font-size: 12px;
 }
+
+/* ==== 手動更新ボタン ==== */
+
+.update-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.update-button button {
+  padding: 4px 14px;
+  border: 1px solid #1258c9;
+  border-radius: 6px;
+  background: #1258c9;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.update-button button:hover:not(:disabled) {
+  background: #0d47a8;
+}
+
+.update-button button:disabled {
+  border-color: var(--border);
+  background: var(--border);
+  color: var(--text-sub);
+  cursor: default;
+}
+
+.update-button__log {
+  color: var(--text-sub);
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+}
+
+.update-button__log--error {
+  color: #b91c1c;
+}

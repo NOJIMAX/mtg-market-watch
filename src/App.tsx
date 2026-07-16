@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import './App.css';
 import { MarketChart } from './components/MarketChart';
+import { UpdateButton } from './components/UpdateButton';
 import { formatJpy, formatPct, formatUsd } from './lib/format';
 import {
   FALLBACK_RATES,
@@ -128,6 +129,8 @@ export default function App() {
   const [sortKey, setSortKey] = useState<WatchSortKey>('netProfit');
   const [showJpy, setShowJpy] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  /** インクリメントすると価格データを再読み込みする（手動更新の完了時） */
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -154,7 +157,7 @@ export default function App() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [reloadKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -316,6 +319,7 @@ export default function App() {
             最終更新: {updated.toLocaleString('ja-JP')}
             {isStale && '（データが古い可能性があります）'}
           </span>
+          <UpdateButton onCompleted={() => setReloadKey((k) => k + 1)} />
           <span className="data-status__counts">
             追跡 {catalog.counts.cards}枚（ヒット中 {catalog.counts.active}枚
             {(catalog.counts.watchSet ?? 0) > 0 && `・セット監視 ${catalog.counts.watchSet}枚`}）/
