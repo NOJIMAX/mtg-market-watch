@@ -51,6 +51,7 @@ npm run dev      # http://localhost:5174
 | SLD | Scryfall 参考価格 **$30以上**・**基本地形を除く**（`e:sld -t:basic`） |
 | LTC / FIC / SOA | Scryfall 参考価格 **$20以上** |
 | `is:doublerainbow` | Double Rainbow Foil（セット横断・$20以上） |
+| `is:judgegift` | ジャッジ褒賞Foil（年度別セット横断・$20以上）。晴れる屋は `[ジャッジ褒賞]`/`[Judge Foil]` 表記のため専用照合（同名の年版違いは「(2020年版)」表記と発売年で対応付け） |
 
 セット監視のカードは条件（しきい値・クエリ）から外れると次回実行時にカタログからも
 外れます（再び条件を満たせば TCGplayer 履歴は過去1年分を取り直せるため実害なし）。

@@ -79,6 +79,7 @@ const DEFAULT_INCLUDED_SETS = [
   { code: 'fic', minUsd: 20 }, // Final Fantasy Commander
   { code: 'soa', minUsd: 20 }, // Secrets of Strixhaven Mystical Archive
   { query: 'is:doublerainbow', label: 'doublerainbow', minUsd: 20 }, // Double Rainbow Foil
+  { query: 'is:judgegift', label: 'judge', minUsd: 20 }, // ジャッジ褒賞Foil（日英価格差の監視）
 ];
 
 const INCLUDED_SETS = process.env.INCLUDED_SETS
@@ -396,6 +397,8 @@ function cardFromScryfall(c, finish) {
     released: c.released_at ?? null,
     // Double Rainbow Foil（シリアル入り）。晴れる屋の商品照合で参照先の区別に使う
     ...(c.promo_types?.includes('doublerainbow') && { dr: true }),
+    // ジャッジ褒賞プロモ。晴れる屋では [ジャッジ褒賞]/[Judge Foil] 表記のため特別照合する
+    ...(c.promo_types?.includes('judgegift') && { judge: true }),
     cmEur: toNum(foil ? (c.prices?.eur_foil ?? c.prices?.eur) : (c.prices?.eur ?? c.prices?.eur_foil)),
     urls: {
       tp: c.purchase_uris?.tcgplayer ?? '',
@@ -691,6 +694,17 @@ function backfillHyBuy(cards, jpRows) {
     else index.set(key, [jp]);
   }
 
+  // ジャッジ褒賞の買取行（買取タイトルは [ジャッジ褒賞]。noteから年版表記が
+  // 失われるため、同名Foil行が一意な場合だけ採用する）
+  const judgeBuyIndex = new Map();
+  for (const jp of jpRows) {
+    if (!isEnglish(jp.language) || jp.setCode !== 'ジャッジ褒賞') continue;
+    const key = `${normalizeCardName(jp.cardName)}|${jp.isFoil ? 'F' : 'N'}`;
+    const list = judgeBuyIndex.get(key);
+    if (list) list.push(jp);
+    else judgeBuyIndex.set(key, [jp]);
+  }
+
   // 同名のダブルレインボウ版が存在する セット|名前 （Foil側の誤照合防止に使う）
   const drSiblings = new Set();
   for (const c of cards) {
@@ -701,6 +715,16 @@ function backfillHyBuy(cards, jpRows) {
   for (const card of cards) {
     if (card.hyBuyJpy != null || !card.name || card.dr) continue;
     const foil = card.finish !== 'nonfoil';
+    if (card.judge) {
+      const rows =
+        judgeBuyIndex.get(`${normalizeCardName(card.name)}|${foil ? 'F' : 'N'}`) ?? [];
+      if (rows.length === 1) {
+        card.hyBuyJpy = rows[0].hareruyaBuyPriceJPY;
+        card.hyBuyUrl = rows[0].url ?? '';
+        filled++;
+      }
+      continue;
+    }
     const setCode = normalizeSetCode(card.hySetCode || card.set || '');
     const nameKey = normalizeCardName(card.name);
     if (foil && drSiblings.has(`${normalizeSetCode(card.set ?? '')}|${nameKey}`)) continue;
@@ -786,11 +810,22 @@ async function fetchHareruyaRetail(card) {
     if (docName && !wantName.split(' // ').some((f) => f === docName) && docName !== wantName) {
       continue;
     }
-    const parsed = parseHyProductName(doc.product_name_en || doc.product_name || '');
-    if (parsed.set !== wantSet && parsed.set !== HY_SET_LABEL_ALIAS[wantSet]) continue;
-    // 同一セットに同名の別版がある場合に備え、番号が両方わかるときだけ番号でも絞る
-    // （DR版のScryfall番号は「136z」だが商品名は「(136)」なので末尾の英字を無視して比較）
-    if (parsed.cn && wantCn && parsed.cn.replace(/\D+$/, '') !== wantCn) continue;
+    if (card.judge) {
+      // ジャッジ褒賞はセット表記が [ジャッジ褒賞]/[Judge Foil]/[DCIマーク] で
+      // Scryfallの年度別セットコード (j20等) と対応しないため、マーカーと
+      // 「(2020年版)」の年表記（あれば）で照合する
+      const names = `${doc.product_name ?? ''} ${doc.product_name_en ?? ''}`;
+      if (!/ジャッジ褒賞|Judge\s*Foil/i.test(names)) continue;
+      const year = names.match(/\((\d{4})年版/)?.[1];
+      const relYear = (card.released ?? '').slice(0, 4);
+      if (year && relYear && year !== relYear) continue;
+    } else {
+      const parsed = parseHyProductName(doc.product_name_en || doc.product_name || '');
+      if (parsed.set !== wantSet && parsed.set !== HY_SET_LABEL_ALIAS[wantSet]) continue;
+      // 同一セットに同名の別版がある場合に備え、番号が両方わかるときだけ番号でも絞る
+      // （DR版のScryfall番号は「136z」だが商品名は「(136)」なので末尾の英字を無視して比較）
+      if (parsed.cn && wantCn && parsed.cn.replace(/\D+$/, '') !== wantCn) continue;
+    }
     products.add(doc.product);
     if (products.size >= 3) break; // 詳細ページの取得は3商品まで
   }

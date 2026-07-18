@@ -18,6 +18,8 @@ export interface WatchCard {
   watchSet?: boolean;
   /** 版の発売日 (YYYY-MM-DD)。2026-07-18以前のデータには存在しない */
   released?: string | null;
+  /** ジャッジ褒賞プロモ */
+  judge?: boolean;
   firstTracked: string;
   /** 晴れる屋側のセットコード（買取行由来） */
   hySetCode: string;
