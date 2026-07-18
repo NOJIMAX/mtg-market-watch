@@ -13,6 +13,11 @@ name: update-data
 on:
   # 手動実行（Actions タブ > update-data > Run workflow。スマホからも可）
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'セットアップ検証のみ（profit-checkerデータの取得確認までで終了）'
+        type: boolean
+        default: false
   schedule:
     # 23:30 UTC = 8:30 JST（利益チェッカーのローカル7:00更新の後）
     - cron: '30 23 * * *'
@@ -43,12 +48,22 @@ jobs:
         with:
           node-version: 24
 
+      - name: Verify profit-checker data
+        run: |
+          ls -la profit-repo/public/prices/
+          node -e "
+            const meta = require('./profit-repo/public/prices/meta.json');
+            console.log('meta.updatedAt:', meta.updatedAt, '/ 晴れる屋', meta.hareruyaCount, '件 / CK', meta.cardKingdomCount, '件');
+          "
+
       - name: Fetch market data
+        if: ${{ !inputs.dry_run }}
         env:
           PROFIT_DATA_DIR: ${{ github.workspace }}/profit-repo/public/prices
         run: node scripts/fetch-market-data.mjs
 
       - name: Commit & push
+        if: ${{ !inputs.dry_run }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
