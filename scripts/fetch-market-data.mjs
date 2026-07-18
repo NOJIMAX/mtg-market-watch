@@ -665,6 +665,81 @@ const HY_SET_LABEL_ALIAS = { MP2: 'MPS' };
 /** ダブルレインボウ（シリアル入り）商品の商品名マーカー */
 const HY_DR_MARKER = /ダブルレインボウ|シリアル|serial|【DR/i;
 
+/**
+ * ヒット判定を経ないカード（セット監視等）に晴れる屋の買取価格を対応付ける。
+ * 利益チェッカーの買取データ（jpRows）を セット・カード名・Foil・番号 で照合し、
+ * hyBuyJpy が未設定のカードにだけ埋める。言語は他ソースに合わせて英語版のみ。
+ *
+ * ダブルレインボウ版は買取データの note からDRマーカーが失われており
+ * 同番のハロー版等と区別できないため対象外。同名DR版が存在するFoilカードも
+ * 誤って高額なDR買取価格を拾わないようスキップする。
+ */
+/**
+ * 買取タイトルのセット表記の別名。Amonkhet Invocations は販売商品名では [MPS] だが
+ * 買取検索のタイトルでは [MPS2] と表記される。
+ */
+const HY_BUY_SET_ALIAS = { MP2: ['MPS2'] };
+
+function backfillHyBuy(cards, jpRows) {
+  const rowCnOf = (jp) => jp.note.match(/#0*(\d+)/)?.[1] ?? null;
+  const index = new Map();
+  for (const jp of jpRows) {
+    if (!isEnglish(jp.language)) continue;
+    const key = `${normalizeSetCode(jp.setCode)}|${normalizeCardName(jp.cardName)}|${jp.isFoil ? 'F' : 'N'}`;
+    const list = index.get(key);
+    if (list) list.push(jp);
+    else index.set(key, [jp]);
+  }
+
+  // 同名のダブルレインボウ版が存在する セット|名前 （Foil側の誤照合防止に使う）
+  const drSiblings = new Set();
+  for (const c of cards) {
+    if (c.dr) drSiblings.add(`${normalizeSetCode(c.set ?? '')}|${normalizeCardName(c.name ?? '')}`);
+  }
+
+  let filled = 0;
+  for (const card of cards) {
+    if (card.hyBuyJpy != null || !card.name || card.dr) continue;
+    const foil = card.finish !== 'nonfoil';
+    const setCode = normalizeSetCode(card.hySetCode || card.set || '');
+    const nameKey = normalizeCardName(card.name);
+    if (foil && drSiblings.has(`${normalizeSetCode(card.set ?? '')}|${nameKey}`)) continue;
+
+    const setCodes = [setCode, ...(HY_BUY_SET_ALIAS[setCode] ?? [])];
+    // 変身カード等は表面の名前でも照合する
+    const nameKeys = [nameKey];
+    const front = nameKey.split(' // ')[0];
+    if (front && front !== nameKey) nameKeys.push(front);
+    const wantCn = String(card.cn ?? '').replace(/\D+/g, '');
+
+    let best = null;
+    let bestScore = -1;
+    for (const code of setCodes) {
+      for (const nk of nameKeys) {
+        for (const jp of index.get(`${code}|${nk}|${foil ? 'F' : 'N'}`) ?? []) {
+          const rowCn = rowCnOf(jp);
+          // 番号が両方わかっていて食い違う行は別版
+          if (rowCn && wantCn && rowCn.replace(/^0+/, '') !== wantCn.replace(/^0+/, '')) continue;
+          const score = rowCn && wantCn ? 2 : rowCn ? 0.5 : 1;
+          if (
+            score > bestScore ||
+            (score === bestScore && jp.hareruyaBuyPriceJPY > (best?.hareruyaBuyPriceJPY ?? -1))
+          ) {
+            best = jp;
+            bestScore = score;
+          }
+        }
+      }
+    }
+    if (best) {
+      card.hyBuyJpy = best.hareruyaBuyPriceJPY;
+      card.hyBuyUrl = best.url ?? '';
+      filled++;
+    }
+  }
+  console.log(`晴れる屋買取: ヒット外の${filled}枚に買取価格を対応付けました`);
+}
+
 function parseHyProductName(name) {
   const set = name.match(/\[([0-9A-Za-z-]+)\]/);
   const cn = name.match(/\((\d+[a-z]?)\)/i);
@@ -942,6 +1017,7 @@ async function main() {
   const trackedCards = (await refreshScryfall(allCards)).filter(
     (c) => !EXCLUDED_SETS.has((c.set ?? '').toLowerCase()),
   );
+  backfillHyBuy(trackedCards, jpRows);
   await fetchCardKingdomRetail(trackedCards);
 
   const tcgHistory = (await readJson(join(OUT_DIR, 'tcg-history.json'))) ?? {};
