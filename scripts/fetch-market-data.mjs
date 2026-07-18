@@ -392,6 +392,8 @@ function cardFromScryfall(c, finish) {
     img: c.image_uris?.normal ?? c.card_faces?.[0]?.image_uris?.normal ?? '',
     scryfallUri: c.scryfall_uri,
     tid: c.tcgplayer_id ?? null,
+    // スパイク検知の「新セット除外」に使う発売日
+    released: c.released_at ?? null,
     // Double Rainbow Foil（シリアル入り）。晴れる屋の商品照合で参照先の区別に使う
     ...(c.promo_types?.includes('doublerainbow') && { dr: true }),
     cmEur: toNum(foil ? (c.prices?.eur_foil ?? c.prices?.eur) : (c.prices?.eur ?? c.prices?.eur_foil)),

@@ -16,6 +16,8 @@ export interface WatchCard {
   active: boolean;
   /** INCLUDED_SETS によるセット単位の監視対象（ヒット判定と無関係に追跡） */
   watchSet?: boolean;
+  /** 版の発売日 (YYYY-MM-DD)。2026-07-18以前のデータには存在しない */
+  released?: string | null;
   firstTracked: string;
   /** 晴れる屋側のセットコード（買取行由来） */
   hySetCode: string;

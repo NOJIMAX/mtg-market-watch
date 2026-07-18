@@ -866,3 +866,16 @@
 .update-button__log--error {
   color: #b91c1c;
 }
+
+/* ==== スパイク検知の根拠表示 ==== */
+
+.watch-spike-vs {
+  color: var(--text-sub);
+  font-size: 11px;
+}
+
+.watch-spike-evidence {
+  color: var(--text-sub);
+  font-size: 11px;
+  line-height: 1.3;
+}

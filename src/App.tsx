@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import './App.css';
 import { MarketChart } from './components/MarketChart';
 import { UpdateButton } from './components/UpdateButton';
+import { computeSpikes } from './lib/spike';
 import { formatJpy, formatPct, formatUsd } from './lib/format';
 import {
   FALLBACK_RATES,
@@ -109,10 +110,8 @@ function tcgChange(tcg: TcgHistoryMap, id: string, days: number): ChangeInfo | n
 /** 一度に描画する最大行数 */
 const MAX_ROWS = 500;
 
-/** 急上昇ピックアップの対象とする90日上昇率のしきい値 */
-const SURGE_MIN_PCT = 0.15;
-/** 急上昇ピックアップの最大表示枚数 */
-const SURGE_MAX = 12;
+/** スパイク検知の最大表示枚数 */
+const SPIKE_MAX = 20;
 
 export default function App() {
   const [catalog, setCatalog] = useState<WatchCatalog | null>(null);
@@ -187,16 +186,11 @@ export default function App() {
     return [...bySet.values()].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code));
   }, [catalog]);
 
-  /** TCG市場価格が90日で SURGE_MIN_PCT 以上上昇しているカード（上昇率の降順） */
-  const surges = useMemo(() => {
-    if (!catalog) return [];
-    return catalog.cards
-      .flatMap((card) => {
-        const ch = tcgChange(tcg, card.id, 90);
-        return ch != null && ch.pct >= SURGE_MIN_PCT ? [{ card, change: ch }] : [];
-      })
-      .sort((a, b) => b.change.pct - a.change.pct);
-  }, [catalog, tcg]);
+  /** 出来高・他ソース同調を加味したスパイク検知（スコア降順） */
+  const spikeResult = useMemo(
+    () => (catalog ? computeSpikes(catalog.cards, tcg, history) : null),
+    [catalog, tcg, history],
+  );
 
   /** 急上昇チップのクリック: フィルタを解除してその行を展開・スクロール */
   const jumpToCard = (id: string) => {
@@ -345,43 +339,61 @@ export default function App() {
         )}
       </section>
 
-      {surges.length > 0 && (
+      {spikeResult && spikeResult.spikes.length > 0 && (
         <section className="panel">
           <h2 className="panel__title">
-            急上昇ピックアップ（TCGplayer市場価格が90日で+{SURGE_MIN_PCT * 100}%以上・
-            {surges.length}枚）
+            スパイク検知（実売ベースの上昇率 × 出来高 × 他ソース同調のスコア上位・候補
+            {spikeResult.candidates}枚）
           </h2>
           <div className="watch-surge-list">
-            {surges.slice(0, SURGE_MAX).map(({ card, change }) => (
+            {spikeResult.spikes.slice(0, SPIKE_MAX).map((s) => (
               <button
-                key={card.id}
+                key={s.card.id}
                 type="button"
                 className="watch-surge-chip"
-                title={`${change.prevDate} 比 / クリックで履歴チャートを表示`}
-                onClick={() => jumpToCard(card.id)}
+                title={`基準値 = 過去30日の実売中央値 / クリックで履歴チャートを表示`}
+                onClick={() => jumpToCard(s.card.id)}
               >
-                {card.img && <img src={card.img} alt="" loading="lazy" />}
+                {s.card.img && <img src={s.card.img} alt="" loading="lazy" />}
                 <span className="watch-surge-chip__body">
-                  <span className="watch-surge-chip__name">{card.name}</span>
+                  <span className="watch-surge-chip__name">{s.card.name}</span>
                   <span className="watch-surge-chip__sub">
-                    {card.set.toUpperCase()} #{card.cn}
-                    {card.finish !== 'nonfoil' && ' Foil'}
+                    {s.card.set.toUpperCase()} #{s.card.cn}
+                    {s.card.finish !== 'nonfoil' && ' Foil'}
                   </span>
                   <span className="watch-surge-chip__price">
-                    {card.tpMarketUsd != null && formatUsd(card.tpMarketUsd)}
+                    {formatUsd(s.recentUsd)}
                     <strong className="tracker-change--up">
-                      ▲{(change.pct * 100).toFixed(0)}%
+                      ▲{(s.shortPct * 100).toFixed(0)}%
                     </strong>
+                    <span className="watch-spike-vs">対30日中央値{formatUsd(s.baselineUsd)}</span>
+                  </span>
+                  <span className="watch-spike-evidence">
+                    {s.sales7 > 0
+                      ? `販売${s.sales7}枚/7日`
+                      : `直近実売 ${s.recentDate.slice(5).replace('-', '/')}`}
+                    {s.sales7 > 0 &&
+                      s.volRatio != null &&
+                      s.volRatio >= 1.5 &&
+                      `（平常の${s.volRatio.toFixed(1)}倍）`}
+                    {s.confirmCount > 0 &&
+                      ` ・ ${(['hy', 'ck', 'cm'] as const)
+                        .filter((k) => {
+                          const p = s.confirm[k];
+                          return p != null && p >= 0.08;
+                        })
+                        .map((k) => ({ hy: '晴れる屋', ck: 'CK', cm: 'CM' })[k])
+                        .join('/')}も上昇`}
                   </span>
                 </span>
               </button>
             ))}
           </div>
-          {surges.length > SURGE_MAX && (
-            <p className="watch-surge-more">
-              他 {surges.length - SURGE_MAX}枚は並び順「TCG市場の90日上昇が大きい順」で確認できます。
-            </p>
-          )}
+          <p className="watch-surge-more">
+            条件: 直近14日に実売あり・$10以上・変化額$5以上・上昇率+10%以上（実売0のバケットと
+            発売90日未満の新セット{spikeResult.newSetCount}枚は除外）
+            {!spikeResult.confirmReady && '。他ソース同調は履歴が5日分たまり次第判定されます'}
+          </p>
         </section>
       )}
 
