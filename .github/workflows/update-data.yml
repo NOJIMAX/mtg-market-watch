@@ -19,8 +19,11 @@ on:
         type: boolean
         default: false
   schedule:
-    # 23:30 UTC = 8:30 JST（利益チェッカーのローカル7:00更新の後）
-    - cron: '30 23 * * *'
+    # 22:43 UTC = 7:43 JST（利益チェッカーのローカル7:00更新の後）。
+    # GitHub のスケジュール実行は混雑時に数時間遅延することがあるため、
+    # 混みやすい00分/30分を避けて早めに設定している。遅延した日は
+    # ローカルの launchd（10:30）が先にフォールバック実行する
+    - cron: '43 22 * * *'
 
 concurrency:
   group: update-data
