@@ -51,14 +51,17 @@ if (!fetched) console.error('fetch-market-data.mjs が失敗しました');
 
 console.log('\n===== git push =====');
 const hasChanges =
-  spawnSync('git', ['status', '--porcelain', 'public/data'], { cwd: repoDir })
+  spawnSync('git', ['status', '--porcelain', 'public/data', 'data/resolve-cache.json'], {
+    cwd: repoDir,
+  })
     .stdout.toString()
     .trim() !== '';
 if (!hasChanges) {
   console.log('価格データに変更がないため push しません');
 } else {
   const pushed =
-    run('git', ['add', 'public/data']) &&
+    // resolve-cache も追跡対象のため一緒にコミットする（残すと pull --rebase が失敗する）
+    run('git', ['add', 'public/data', 'data/resolve-cache.json']) &&
     run('git', ['commit', '-m', `chore: 価格データ更新 (${new Date().toISOString().slice(0, 10)})`]) &&
     run('git', ['pull', '--rebase', 'origin', 'main']) &&
     run('git', ['push', 'origin', 'main']);

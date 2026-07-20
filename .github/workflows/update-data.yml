@@ -20,10 +20,12 @@ on:
         default: false
   schedule:
     # 22:43 UTC = 7:43 JST（利益チェッカーのローカル7:00更新の後）。
-    # GitHub のスケジュール実行は混雑時に数時間遅延することがあるため、
-    # 混みやすい00分/30分を避けて早めに設定している。遅延した日は
-    # ローカルの launchd（10:30）が先にフォールバック実行する
+    # GitHub のスケジュール実行は混雑時に遅延・欠落する（2026-07-20は丸ごと未発火）
+    # ため、2時間後にリトライ枠をもう1本設定する。当日分が取得済みの場合は
+    # 下の「Skip if already updated today」ガードで何もせず終了する。
+    # それでも両方落ちた日はローカルの launchd（10:30）がフォールバック実行する
     - cron: '43 22 * * *'
+    - cron: '43 0 * * *'
 
 concurrency:
   group: update-data
@@ -51,7 +53,19 @@ jobs:
         with:
           node-version: 24
 
+      - name: Skip if already updated today
+        id: guard
+        run: |
+          FRESH=$(node -e "
+            const cards = require('./public/data/cards.json');
+            const jst = (iso) => new Date(Date.parse(iso) + 9 * 3600000).toISOString().slice(0, 10);
+            console.log(jst(cards.updatedAt) === jst(new Date().toISOString()) ? 'yes' : 'no');
+          ")
+          echo "fresh=$FRESH" >> "$GITHUB_OUTPUT"
+          [ "$FRESH" = "yes" ] && echo "今日のデータは取得済みのためスキップします" || true
+
       - name: Verify profit-checker data
+        if: ${{ steps.guard.outputs.fresh != 'yes' }}
         run: |
           ls -la profit-repo/public/prices/
           node -e "
@@ -60,13 +74,13 @@ jobs:
           "
 
       - name: Fetch market data
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !inputs.dry_run && steps.guard.outputs.fresh != 'yes' }}
         env:
           PROFIT_DATA_DIR: ${{ github.workspace }}/profit-repo/public/prices
         run: node scripts/fetch-market-data.mjs
 
       - name: Commit & push
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !inputs.dry_run && steps.guard.outputs.fresh != 'yes' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
