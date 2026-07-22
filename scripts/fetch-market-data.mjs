@@ -80,6 +80,8 @@ const DEFAULT_INCLUDED_SETS = [
   { code: 'soa', minUsd: 20 }, // Secrets of Strixhaven Mystical Archive
   { query: 'is:doublerainbow', label: 'doublerainbow', minUsd: 20 }, // Double Rainbow Foil
   { query: 'is:judgegift', label: 'judge', minUsd: 20 }, // ジャッジ褒賞Foil（日英価格差の監視）
+  // LTRホリデーリリース（独立セットではなく ltr の 2023-11-03 追加分 #452〜）
+  { query: 'e:ltr date>=2023-11-01', label: 'ltr-holiday', minUsd: 20 },
 ];
 
 const INCLUDED_SETS = process.env.INCLUDED_SETS
