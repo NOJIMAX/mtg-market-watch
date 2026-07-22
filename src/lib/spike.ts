@@ -11,6 +11,8 @@ import type { TcgHistoryMap, WatchCard, WatchHistory } from '../types/market';
  */
 export interface SpikeInfo {
   card: WatchCard;
+  /** up = 急騰、down = 急落 */
+  direction: 'up' | 'down';
   score: number;
   /** 直近の実売価格 ÷ 基準値（過去30日の実売中央値）- 1 */
   shortPct: number;
@@ -25,14 +27,15 @@ export interface SpikeInfo {
   volRatio: number | null;
   /** 他ソースの同期間の変化率。履歴が5日分たまるまでは null */
   confirm: { ck: number | null; cm: number | null; hy: number | null };
-  /** +8%以上同調している他ソースの数 */
+  /** 同方向に8%以上同調している他ソースの数 */
   confirmCount: number;
 }
 
 export interface SpikeResult {
-  spikes: SpikeInfo[];
-  /** スコアリング対象になった候補数（フィルタ通過数） */
-  candidates: number;
+  /** 急騰（スコア降順） */
+  ups: SpikeInfo[];
+  /** 急落（スコア降順） */
+  downs: SpikeInfo[];
   /** 発売90日未満のため除外した「新セット」カード数 */
   newSetCount: number;
   /** 他ソース同調の判定に履歴が足りているか（5日分未満だと全カード null） */
@@ -68,7 +71,6 @@ export function computeSpikes(
 ): SpikeResult {
   const now = Date.now();
   const spikes: SpikeInfo[] = [];
-  let candidates = 0;
   let newSetCount = 0;
 
   // 他ソース同調: 直近30日窓の最古スナップショットと最新スナップショットを比較する。
@@ -127,15 +129,25 @@ export function computeSpikes(
     const baselineUsd = median(base.map((d) => buckets[d][0]));
     if (baselineUsd <= 0) continue;
 
+    // 上昇・下落を対称に判定する。下落側は「下落前に$10以上だったカード」が対象
+    // （急落後の現在価格ではなく基準値に価格下限をかける）
     const shortPct = recentUsd / baselineUsd - 1;
+    let direction: 'up' | 'down';
     if (
-      recentUsd < MIN_RECENT_USD ||
-      recentUsd - baselineUsd < MIN_ABS_CHANGE_USD ||
-      shortPct < MIN_SHORT_PCT
+      shortPct >= MIN_SHORT_PCT &&
+      recentUsd >= MIN_RECENT_USD &&
+      recentUsd - baselineUsd >= MIN_ABS_CHANGE_USD
     ) {
+      direction = 'up';
+    } else if (
+      shortPct <= -MIN_SHORT_PCT &&
+      baselineUsd >= MIN_RECENT_USD &&
+      baselineUsd - recentUsd >= MIN_ABS_CHANGE_USD
+    ) {
+      direction = 'down';
+    } else {
       continue;
     }
-    candidates++;
 
     // 出来高: 直近7日の販売枚数と、それ以前30日（7〜37日前）の週平均の比
     const sales7 = dates
@@ -155,13 +167,19 @@ export function computeSpikes(
       ck: sourcePct(card.id, 2),
       cm: sourcePct(card.id, 4),
     };
-    const confirmCount = Object.values(confirm).filter((p) => p != null && p >= CONFIRM_PCT).length;
+    // 同調は検知と同じ方向の変化だけを数える
+    const confirmCount = Object.values(confirm).filter(
+      (p) => p != null && (direction === 'up' ? p >= CONFIRM_PCT : p <= -CONFIRM_PCT),
+    ).length;
 
     const score =
-      shortPct * 100 + Math.min(volRatio ?? 0, VOL_CAP) * WEIGHT_VOL + confirmCount * WEIGHT_CONFIRM;
+      Math.abs(shortPct) * 100 +
+      Math.min(volRatio ?? 0, VOL_CAP) * WEIGHT_VOL +
+      confirmCount * WEIGHT_CONFIRM;
 
     spikes.push({
       card,
+      direction,
       score,
       shortPct,
       baselineUsd,
@@ -175,5 +193,10 @@ export function computeSpikes(
   }
 
   spikes.sort((a, b) => b.score - a.score);
-  return { spikes, candidates, newSetCount, confirmReady };
+  return {
+    ups: spikes.filter((s) => s.direction === 'up'),
+    downs: spikes.filter((s) => s.direction === 'down'),
+    newSetCount,
+    confirmReady,
+  };
 }

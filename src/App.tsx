@@ -111,8 +111,10 @@ function tcgChange(tcg: TcgHistoryMap, id: string, days: number): ChangeInfo | n
 /** 一度に描画する最大行数 */
 const MAX_ROWS = 500;
 
-/** スパイク検知の最大表示枚数 */
+/** スパイク検知（上昇）の最大表示枚数 */
 const SPIKE_MAX = 20;
+/** 急落検知の最大表示枚数 */
+const DROP_MAX = 10;
 
 export default function App() {
   const [catalog, setCatalog] = useState<WatchCatalog | null>(null);
@@ -340,63 +342,92 @@ export default function App() {
         )}
       </section>
 
-      {spikeResult && spikeResult.spikes.length > 0 && (
-        <section className="panel">
-          <h2 className="panel__title">
-            スパイク検知（実売ベースの上昇率 × 出来高 × 他ソース同調のスコア上位・候補
-            {spikeResult.candidates}枚）
-          </h2>
-          <div className="watch-surge-list">
-            {spikeResult.spikes.slice(0, SPIKE_MAX).map((s) => (
-              <button
-                key={s.card.id}
-                type="button"
-                className="watch-surge-chip"
-                title={`基準値 = 過去30日の実売中央値 / クリックで履歴チャートを表示`}
-                onClick={() => jumpToCard(s.card.id)}
-              >
-                {s.card.img && <img src={s.card.img} alt="" loading="lazy" />}
-                <span className="watch-surge-chip__body">
-                  <span className="watch-surge-chip__name">{s.card.name}</span>
-                  <span className="watch-surge-chip__sub">
-                    {s.card.set.toUpperCase()} #{s.card.cn}
-                    {s.card.finish !== 'nonfoil' && ' Foil'}
-                  </span>
-                  <span className="watch-surge-chip__price">
-                    {formatUsd(s.recentUsd)}
-                    <strong className="tracker-change--up">
-                      ▲{(s.shortPct * 100).toFixed(0)}%
-                    </strong>
-                    <span className="watch-spike-vs">対30日中央値{formatUsd(s.baselineUsd)}</span>
-                  </span>
-                  <span className="watch-spike-evidence">
-                    {s.sales7 > 0
-                      ? `販売${s.sales7}枚/7日`
-                      : `直近実売 ${s.recentDate.slice(5).replace('-', '/')}`}
-                    {s.sales7 > 0 &&
-                      s.volRatio != null &&
-                      s.volRatio >= 1.5 &&
-                      `（平常の${s.volRatio.toFixed(1)}倍）`}
-                    {s.confirmCount > 0 &&
-                      ` ・ ${(['hy', 'ck', 'cm'] as const)
-                        .filter((k) => {
-                          const p = s.confirm[k];
-                          return p != null && p >= 0.08;
-                        })
-                        .map((k) => ({ hy: '晴れる屋', ck: 'CK', cm: 'CM' })[k])
-                        .join('/')}も上昇`}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-          <p className="watch-surge-more">
-            条件: 直近14日に実売あり・$10以上・変化額$5以上・上昇率+10%以上（実売0のバケットと
-            発売90日未満の新セット{spikeResult.newSetCount}枚は除外）
-            {!spikeResult.confirmReady && '。他ソース同調は履歴が5日分たまり次第判定されます'}
-          </p>
-        </section>
-      )}
+      {spikeResult &&
+        (
+          [
+            {
+              key: 'up',
+              list: spikeResult.ups,
+              max: SPIKE_MAX,
+              title: 'スパイク検知（実売ベースの上昇率 × 出来高 × 他ソース同調のスコア上位',
+              mark: '▲',
+              markClass: 'tracker-change--up',
+              word: '上昇',
+            },
+            {
+              key: 'down',
+              list: spikeResult.downs,
+              max: DROP_MAX,
+              title: '急落検知（実売ベースの下落率 × 出来高 × 他ソース同調のスコア上位',
+              mark: '▼',
+              markClass: 'watch-drop',
+              word: '下落',
+            },
+          ] as const
+        ).map(
+          ({ key, list, max, title, mark, markClass, word }) =>
+            list.length > 0 && (
+              <section className="panel" key={key}>
+                <h2 className="panel__title">
+                  {title}・候補{list.length}枚）
+                </h2>
+                <div className="watch-surge-list">
+                  {list.slice(0, max).map((s) => (
+                    <button
+                      key={s.card.id}
+                      type="button"
+                      className="watch-surge-chip"
+                      title="基準値 = 過去30日の実売中央値 / クリックで履歴チャートを表示"
+                      onClick={() => jumpToCard(s.card.id)}
+                    >
+                      {s.card.img && <img src={s.card.img} alt="" loading="lazy" />}
+                      <span className="watch-surge-chip__body">
+                        <span className="watch-surge-chip__name">{s.card.name}</span>
+                        <span className="watch-surge-chip__sub">
+                          {s.card.set.toUpperCase()} #{s.card.cn}
+                          {s.card.finish !== 'nonfoil' && ' Foil'}
+                        </span>
+                        <span className="watch-surge-chip__price">
+                          {formatUsd(s.recentUsd)}
+                          <strong className={markClass}>
+                            {mark}
+                            {Math.abs(s.shortPct * 100).toFixed(0)}%
+                          </strong>
+                          <span className="watch-spike-vs">
+                            対30日中央値{formatUsd(s.baselineUsd)}
+                          </span>
+                        </span>
+                        <span className="watch-spike-evidence">
+                          {s.sales7 > 0
+                            ? `販売${s.sales7}枚/7日`
+                            : `直近実売 ${s.recentDate.slice(5).replace('-', '/')}`}
+                          {s.sales7 > 0 &&
+                            s.volRatio != null &&
+                            s.volRatio >= 1.5 &&
+                            `（平常の${s.volRatio.toFixed(1)}倍）`}
+                          {s.confirmCount > 0 &&
+                            ` ・ ${(['hy', 'ck', 'cm'] as const)
+                              .filter((k) => {
+                                const p = s.confirm[k];
+                                return p != null && (key === 'up' ? p >= 0.08 : p <= -0.08);
+                              })
+                              .map((k) => ({ hy: '晴れる屋', ck: 'CK', cm: 'CM' })[k])
+                              .join('/')}も${word}`}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <p className="watch-surge-more">
+                  条件: 直近14日に実売あり・{word === '上昇' ? '$10以上' : '下落前$10以上'}
+                  ・変化額$5以上・{word}率10%以上（実売0のバケットと発売90日未満の新セット
+                  {spikeResult.newSetCount}枚は除外）
+                  {!spikeResult.confirmReady &&
+                    '。他ソース同調は履歴が5日分たまり次第判定されます'}
+                </p>
+              </section>
+            ),
+        )}
 
       <WatchlistPanel trackedIds={new Set(catalog.cards.map((c) => c.id))} />
 

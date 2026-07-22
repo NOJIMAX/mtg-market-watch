@@ -996,3 +996,9 @@
   display: flex;
   gap: 6px;
 }
+
+/* ==== 急落検知 ==== */
+
+.watch-drop {
+  color: #b91c1c;
+}
