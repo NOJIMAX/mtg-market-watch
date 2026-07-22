@@ -20,6 +20,8 @@ export interface WatchCard {
   released?: string | null;
   /** ジャッジ褒賞プロモ */
   judge?: boolean;
+  /** 手動監視リスト (data/manual-watchlist.json) による追跡 */
+  manual?: boolean;
   firstTracked: string;
   /** 晴れる屋側のセットコード（買取行由来） */
   hySetCode: string;
@@ -68,6 +70,8 @@ export interface WatchCatalog {
     active: number;
     /** 2026-07-15以前のデータには存在しない */
     watchSet?: number;
+    /** 手動監視の枚数。2026-07-20以前のデータには存在しない */
+    manual?: number;
     hareruya: number;
     cardKingdom: number;
     tcgplayer: number;

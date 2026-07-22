@@ -996,6 +996,40 @@ async function main() {
   // 4.5 セット指定の監視リストを追加する
   await addWatchedSets(cards, prevCards);
 
+  // 4.6 手動監視リスト（data/manual-watchlist.json）を追加する。
+  //     カード情報は後続の refreshScryfall が Scryfall ID から埋める
+  const manualList = (await readJson(join(ROOT, 'data', 'manual-watchlist.json'))) ?? {
+    cards: [],
+  };
+  for (const m of manualList.cards) {
+    const id = `${m.sid}:${m.finish}`;
+    const existing = cards.get(id);
+    if (existing) {
+      existing.manual = true;
+      continue;
+    }
+    cards.set(id, {
+      id,
+      sid: m.sid,
+      finish: m.finish,
+      urls: {},
+      manual: true,
+      active: false,
+      firstTracked: prevCards.get(id)?.firstTracked ?? todayJst(),
+      language: 'English',
+      hyBuyJpy: null,
+      hyBuyUrl: '',
+      ckBuylistUsd: null,
+      ckMaxQty: 0,
+      netProfitJpy: null,
+      profitRate: null,
+      cautions: [],
+    });
+  }
+  if (manualList.cards.length > 0) {
+    console.log(`手動監視: ${manualList.cards.length}枚を追跡対象に含めました`);
+  }
+
   // 5. 前回追跡していて今回ヒットしなかったカードを active:false で引き継ぐ。
   //    解決済みキャッシュを使って「今回の照合結果のうち同じ版・仕上げの行」を対応付け、
   //    ヒット外でも買取価格・利益は最新化する
@@ -1011,15 +1045,17 @@ async function main() {
     if (cards.has(id)) continue;
     // 除外セットに指定されたカードは過去に追跡していてもカタログから外す
     if (EXCLUDED_SETS.has((prev.set ?? '').toLowerCase())) continue;
-    // セット監視のみで追跡していたカードは、条件（しきい値・クエリ・設定削除）から
-    // 外れたらカタログからも外す。ヒット経験のあるカードは「ヒット外」として残す
-    if (prev.watchSet && !prev.active) continue;
+    // セット監視・手動監視のみで追跡していたカードは、条件（しきい値・クエリ・
+    // リストからの削除）から外れたらカタログからも外す。
+    // ヒット経験のあるカードは「ヒット外」として残す
+    if ((prev.watchSet || prev.manual) && !prev.active) continue;
     const stale = hitById.get(id);
     cards.set(id, {
       ...prev,
       active: false,
-      // セット監視から外れた場合はフラグを落とす（監視中ならこのループに来ない）
+      // セット監視・手動監視から外れた場合はフラグを落とす（監視中ならこのループに来ない）
       watchSet: false,
+      manual: false,
       // 買取価格・利益はヒット外でも照合できた場合のみ更新する
       ...(stale && {
         hyBuyJpy: stale.jp.hareruyaBuyPriceJPY,
@@ -1051,8 +1087,9 @@ async function main() {
 
   // 6. 各ソースの価格・履歴を取得する
   // 晴れる屋とScryfallでセットコードが異なる場合に備え、解決後のセットでも除外を適用する
+  // 手動監視のカードはユーザーが明示的に選んだものなので除外セットより優先する
   const trackedCards = (await refreshScryfall(allCards)).filter(
-    (c) => !EXCLUDED_SETS.has((c.set ?? '').toLowerCase()),
+    (c) => c.manual || !EXCLUDED_SETS.has((c.set ?? '').toLowerCase()),
   );
   backfillHyBuy(trackedCards, jpRows);
   await fetchCardKingdomRetail(trackedCards);
@@ -1082,6 +1119,7 @@ async function main() {
     cards: trackedCards.length,
     active: trackedCards.filter((c) => c.active).length,
     watchSet: trackedCards.filter((c) => c.watchSet).length,
+    manual: trackedCards.filter((c) => c.manual).length,
     hareruya: trackedCards.filter((c) => c.hyJpy != null).length,
     cardKingdom: trackedCards.filter((c) => c.ckUsd != null).length,
     tcgplayer: trackedCards.filter((c) => c.tpMarketUsd != null).length,

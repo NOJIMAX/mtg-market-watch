@@ -1,11 +1,110 @@
-import { spawn, type ChildProcess } from 'node:child_process'
-import { createWriteStream, mkdirSync } from 'node:fs'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
+import { createWriteStream, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import type { IncomingMessage } from 'node:http'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 
 const root = dirname(fileURLToPath(import.meta.url))
+
+/**
+ * 手動監視リストのエンドポイント（ローカル開発サーバー専用）
+ *   GET  /api/watchlist         現在のリスト
+ *   POST /api/watchlist         追加 { sid, finish, name, set, cn }
+ *   POST /api/watchlist/remove  削除 { id }  (id = "sid:finish")
+ * 変更のたびに data/manual-watchlist.json へ書き込み、ベストエフォートで
+ * git commit & push する（CIが翌朝のリストを読むため。オフライン時は
+ * 次回の update-all.mjs のコミットに相乗りする）。
+ */
+function watchlistEndpoint(): Plugin {
+  const path = join(root, 'data', 'manual-watchlist.json')
+  const read = () => {
+    try {
+      return JSON.parse(readFileSync(path, 'utf8')) as { cards: Record<string, string>[] }
+    } catch {
+      return { cards: [] }
+    }
+  }
+  const readBody = (req: IncomingMessage) =>
+    new Promise<Record<string, string>>((resolve, reject) => {
+      let body = ''
+      req.on('data', (c) => {
+        body += c
+      })
+      req.on('end', () => {
+        try {
+          resolve(JSON.parse(body))
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  const save = (list: { cards: Record<string, string>[] }, message: string) => {
+    writeFileSync(path, `${JSON.stringify(list, null, 2)}\n`)
+    // ベストエフォートの commit & push（失敗しても翌日の update-all が拾う）
+    const git = (...args: string[]) => spawnSync('git', args, { cwd: root })
+    git('add', 'data/manual-watchlist.json')
+    if (git('diff', '--cached', '--quiet').status !== 0) {
+      git('commit', '-m', message)
+      git('pull', '--rebase', 'origin', 'main')
+      git('push', 'origin', 'main')
+    }
+  }
+  return {
+    name: 'watchlist-endpoint',
+    configureServer(server) {
+      server.middlewares.use('/api/watchlist', (req, res) => {
+        res.setHeader('Content-Type', 'application/json')
+        void (async () => {
+          if (req.method === 'GET') {
+            res.end(JSON.stringify(read()))
+            return
+          }
+          if (req.method !== 'POST') {
+            res.statusCode = 405
+            res.end(JSON.stringify({ error: 'method not allowed' }))
+            return
+          }
+          const body = await readBody(req)
+          const list = read()
+          if (req.url?.startsWith('/remove')) {
+            const before = list.cards.length
+            list.cards = list.cards.filter((c) => `${c.sid}:${c.finish}` !== body.id)
+            if (list.cards.length !== before) {
+              save(list, `watchlist: ${body.name ?? body.id} を削除`)
+            }
+            res.end(JSON.stringify(list))
+            return
+          }
+          if (!body.sid || !body.finish) {
+            res.statusCode = 400
+            res.end(JSON.stringify({ error: 'sid と finish は必須です' }))
+            return
+          }
+          if (!list.cards.some((c) => c.sid === body.sid && c.finish === body.finish)) {
+            list.cards.push({
+              sid: body.sid,
+              finish: body.finish,
+              name: body.name ?? '',
+              set: body.set ?? '',
+              cn: body.cn ?? '',
+              addedAt: new Date().toISOString().slice(0, 10),
+            })
+            save(
+              list,
+              `watchlist: ${body.name ?? body.sid} [${body.set ?? ''}#${body.cn ?? ''} ${body.finish}] を追加`,
+            )
+          }
+          res.end(JSON.stringify(list))
+        })().catch((err: unknown) => {
+          res.statusCode = 500
+          res.end(JSON.stringify({ error: String(err) }))
+        })
+      })
+    },
+  }
+}
 
 /**
  * 手動更新エンドポイント（ローカル開発サーバー専用）
@@ -85,6 +184,6 @@ function manualUpdateEndpoint(): Plugin {
 
 // mtg-profit-checker (5173) と同時に起動できるようポートをずらす
 export default defineConfig({
-  plugins: [react(), manualUpdateEndpoint()],
+  plugins: [react(), manualUpdateEndpoint(), watchlistEndpoint()],
   server: { port: 5174 },
 })
