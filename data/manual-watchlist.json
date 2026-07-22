@@ -1,1 +1,12 @@
-{"cards":[]}
+{
+  "cards": [
+    {
+      "sid": "235c0ece-aed0-4120-99cc-5d0e28fa70ab",
+      "finish": "nonfoil",
+      "name": "Sliver Queen",
+      "set": "sth",
+      "cn": "129",
+      "addedAt": "2026-07-22"
+    }
+  ]
+}
