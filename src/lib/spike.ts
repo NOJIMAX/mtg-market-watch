@@ -21,7 +21,7 @@ export interface SpikeInfo {
   recentDate: string;
   /** 直近7日間の販売枚数 */
   sales7: number;
-  /** 直近7日の販売枚数 ÷ 過去90日の週平均。平常時の実売が無い場合は null */
+  /** 直近7日の販売枚数 ÷ 過去30日の週平均。平常時の実売が無い場合は null */
   volRatio: number | null;
   /** 他ソースの同期間の変化率。履歴が5日分たまるまでは null */
   confirm: { ck: number | null; cm: number | null; hy: number | null };
@@ -116,14 +116,13 @@ export function computeSpikes(
     const recentUsd = buckets[recentDate][0];
     const recentTs = Date.parse(recentDate);
 
-    // 基準値: 直近を除いた過去30日の実売中央値（薄い場合は90日まで広げる）
-    const baseWindow = (days: number) =>
-      real.filter((d) => {
-        const t = Date.parse(d);
-        return recentTs - t >= 7 * DAY && recentTs - t < days * DAY;
-      });
-    let base = baseWindow(40);
-    if (base.length < 2) base = baseWindow(95);
+    // 基準値: 直近を除いた過去30日（7〜37日前）の実売中央値。
+    // 検知期間を1ヶ月に収めるため、これより古い実売には遡らない
+    // （1ヶ月内に実売が2回未満のカードは流動性不足として対象外）
+    const base = real.filter((d) => {
+      const t = Date.parse(d);
+      return recentTs - t >= 7 * DAY && recentTs - t < 37 * DAY;
+    });
     if (base.length < 2) continue;
     const baselineUsd = median(base.map((d) => buckets[d][0]));
     if (baselineUsd <= 0) continue;
@@ -138,17 +137,17 @@ export function computeSpikes(
     }
     candidates++;
 
-    // 出来高: 直近7日の販売枚数と、それ以前90日の週平均の比
+    // 出来高: 直近7日の販売枚数と、それ以前30日（7〜37日前）の週平均の比
     const sales7 = dates
       .filter((d) => now - Date.parse(d) < 7 * DAY)
       .reduce((sum, d) => sum + buckets[d][1], 0);
     const priorQty = dates
       .filter((d) => {
         const age = now - Date.parse(d);
-        return age >= 7 * DAY && age < 97 * DAY;
+        return age >= 7 * DAY && age < 37 * DAY;
       })
       .reduce((sum, d) => sum + buckets[d][1], 0);
-    const weeklyAvg = priorQty / (90 / 7);
+    const weeklyAvg = priorQty / (30 / 7);
     const volRatio = weeklyAvg > 0 ? sales7 / weeklyAvg : null;
 
     const confirm = {
