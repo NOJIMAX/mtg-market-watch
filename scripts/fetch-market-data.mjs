@@ -1029,6 +1029,9 @@ async function main() {
   if (manualList.cards.length > 0) {
     console.log(`手動監視: ${manualList.cards.length}枚を追跡対象に含めました`);
   }
+  // 本番サイトの読み取り専用表示用に public 側へも複製する
+  await mkdir(OUT_DIR, { recursive: true });
+  await writeFile(join(OUT_DIR, 'manual-watchlist.json'), JSON.stringify(manualList));
 
   // 5. 前回追跡していて今回ヒットしなかったカードを active:false で引き継ぐ。
   //    解決済みキャッシュを使って「今回の照合結果のうち同じ版・仕上げの行」を対応付け、

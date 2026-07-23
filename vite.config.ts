@@ -42,9 +42,11 @@ function watchlistEndpoint(): Plugin {
     })
   const save = (list: { cards: Record<string, string>[] }, message: string) => {
     writeFileSync(path, `${JSON.stringify(list, null, 2)}\n`)
+    // 本番サイトの読み取り専用表示用に public 側へも複製する
+    writeFileSync(join(root, 'public', 'data', 'manual-watchlist.json'), JSON.stringify(list))
     // ベストエフォートの commit & push（失敗しても翌日の update-all が拾う）
     const git = (...args: string[]) => spawnSync('git', args, { cwd: root })
-    git('add', 'data/manual-watchlist.json')
+    git('add', 'data/manual-watchlist.json', 'public/data/manual-watchlist.json')
     if (git('diff', '--cached', '--quiet').status !== 0) {
       git('commit', '-m', message)
       git('pull', '--rebase', 'origin', 'main')

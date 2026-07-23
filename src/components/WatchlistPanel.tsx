@@ -32,7 +32,7 @@ const FINISH_LABEL: Record<string, string> = { nonfoil: '通常', foil: 'Foil', 
  * 次回のデータ更新（今すぐ更新 or 翌朝の自動実行）から追跡が始まる。
  */
 export function WatchlistPanel({ trackedIds }: { trackedIds: Set<string> }) {
-  const [available, setAvailable] = useState(false);
+  const [mode, setMode] = useState<'hidden' | 'local' | 'readonly'>('hidden');
   const [entries, setEntries] = useState<WatchlistEntry[]>([]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ScryfallPrint[]>([]);
@@ -40,14 +40,28 @@ export function WatchlistPanel({ trackedIds }: { trackedIds: Set<string> }) {
   const [message, setMessage] = useState('');
 
   const load = useCallback(async () => {
+    const isJson = (res: Response) =>
+      res.ok && (res.headers.get('content-type') ?? '').includes('json');
     try {
       const res = await fetch('/api/watchlist');
-      if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return;
-      const list = (await res.json()) as { cards: WatchlistEntry[] };
-      setAvailable(true);
-      setEntries(list.cards);
+      if (isJson(res)) {
+        setMode('local');
+        setEntries(((await res.json()) as { cards: WatchlistEntry[] }).cards);
+        return;
+      }
     } catch {
-      // 本番（静的サイト）ではエンドポイントが無い
+      // 本番（静的サイト）ではエンドポイントが無い → 読み取り専用にフォールバック
+    }
+    try {
+      const res = await fetch(
+        `${import.meta.env.BASE_URL}data/manual-watchlist.json?t=${Date.now()}`,
+      );
+      if (isJson(res)) {
+        setMode('readonly');
+        setEntries(((await res.json()) as { cards: WatchlistEntry[] }).cards);
+      }
+    } catch {
+      // 複製ファイルがまだ無い（初回デプロイ前）場合は非表示のまま
     }
   }, []);
 
@@ -55,7 +69,8 @@ export function WatchlistPanel({ trackedIds }: { trackedIds: Set<string> }) {
     load();
   }, [load]);
 
-  if (!available) return null;
+  if (mode === 'hidden') return null;
+  const readonly = mode === 'readonly';
 
   const search = async () => {
     const q = query.trim();
@@ -118,7 +133,9 @@ export function WatchlistPanel({ trackedIds }: { trackedIds: Set<string> }) {
       <summary className="panel__summary">
         手動監視リスト（{entries.length}枚）
         <span className="panel__summary-hint">
-          Scryfall検索でカードを追加。次回更新から追跡されます
+          {readonly
+            ? '追加・削除はローカルの npm run dev 画面から行えます'
+            : 'Scryfall検索でカードを追加。次回更新から追跡されます'}
         </span>
       </summary>
       <div className="panel__body">
@@ -134,14 +151,20 @@ export function WatchlistPanel({ trackedIds }: { trackedIds: Set<string> }) {
                     </span>
                     {!tracked && <span className="watchlist-pending">次回更新で追跡開始</span>}
                   </span>
-                  <button type="button" onClick={() => remove(e)}>
-                    削除
-                  </button>
+                  {!readonly && (
+                    <button type="button" onClick={() => remove(e)}>
+                      削除
+                    </button>
+                  )}
                 </li>
               );
             })}
           </ul>
         )}
+        {readonly && entries.length === 0 && (
+          <p className="watchlist-sub">まだカードが登録されていません。</p>
+        )}
+        {!readonly && (
         <div className="watchlist-search">
           <input
             type="search"
@@ -157,6 +180,7 @@ export function WatchlistPanel({ trackedIds }: { trackedIds: Set<string> }) {
           </button>
           {message && <span className="watchlist-sub">{message}</span>}
         </div>
+        )}
         {results.length > 0 && (
           <ul className="watchlist-results">
             {results.map((p) => {
