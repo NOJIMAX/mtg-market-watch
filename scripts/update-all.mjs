@@ -29,6 +29,8 @@ const todayJst = () => new Date(Date.now() + 9 * 3600000).toISOString().slice(0,
 if (process.env.FORCE !== '1') {
   // CI (update-data ワークフロー) が今日の分を取得済みなら何もしない
   if (!run('git', ['pull', '--rebase', 'origin', 'main'])) {
+    // 途中で止まったrebaseが残っていると以後の全git操作が壊れるため必ず片付ける
+    run('git', ['rebase', '--abort']);
     console.warn('git pull に失敗しました（オフライン?）。ローカルのデータで判定します');
   }
   try {
@@ -59,12 +61,32 @@ const hasChanges =
 if (!hasChanges) {
   console.log('価格データに変更がないため push しません');
 } else {
+  /**
+   * pull --rebase がデータファイルで競合した場合の自動復旧。
+   * 遅延したCIとローカルの両方が同日データをコミットすると必ず競合するが、
+   * 中身は同日の等価なデータなのでリモート（CI取得分）を優先して
+   * ローカルのデータコミットを取り下げる。放置すると止まったrebaseが
+   * 残って以後のgit操作が全滅する（2026-07-25に発生）ためここで必ず解消する。
+   */
+  const pullOrPreferRemote = () => {
+    if (run('git', ['pull', '--rebase', 'origin', 'main'])) return true;
+    console.warn('pull --rebase が競合しました。データはリモート（CI取得分）を優先します');
+    run('git', ['rebase', '--abort']);
+    // 直前のローカルデータコミットを取り消し、データファイルをリモート版で
+    // コミットし直す。rebase 時に差分が空になったコミットは自動で破棄されるため、
+    // これで再 pull が競合せずに完了する
+    run('git', ['reset', '--mixed', 'HEAD~1']);
+    run('git', ['checkout', 'origin/main', '--', 'public/data', 'data']);
+    run('git', ['commit', '-m', 'chore: 競合したデータはリモート(CI)版を採用']);
+    return run('git', ['pull', '--rebase', 'origin', 'main']);
+  };
+
   const pushed =
     // data/ 配下（resolve-cache・手動監視リスト）も追跡対象のため一緒にコミットする
     // （未ステージのまま残すと pull --rebase が失敗する）
     run('git', ['add', 'public/data', 'data']) &&
     run('git', ['commit', '-m', `chore: 価格データ更新 (${new Date().toISOString().slice(0, 10)})`]) &&
-    run('git', ['pull', '--rebase', 'origin', 'main']) &&
+    pullOrPreferRemote() &&
     run('git', ['push', 'origin', 'main']);
   if (pushed) {
     console.log('push 完了。GitHub Actions がデプロイします');

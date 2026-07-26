@@ -26,6 +26,8 @@ on:
     # それでも両方落ちた日はローカルの launchd（10:30）がフォールバック実行する
     - cron: '43 22 * * *'
     - cron: '43 0 * * *'
+    # cronが数時間遅延・丸ごと欠落する日があるため午後にも保険枠（13:43 JST）
+    - cron: '43 4 * * *'
 
 concurrency:
   group: update-data
