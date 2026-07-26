@@ -483,8 +483,14 @@ async function addWatchedSets(cards, prevCards) {
 /** 追跡カードの Cardmarket 価格・画像などを /cards/collection でまとめて更新する */
 async function refreshScryfall(cards) {
   console.log('Scryfall: 追跡カードの最新情報を取得中...');
-  const byId = new Map(cards.map((c) => [c.sid, c]));
-  const ids = [...byId.keys()];
+  // 同じ版の通常とFoilを両方追跡している場合があるため、sid → カード配列で持つ
+  const bySid = new Map();
+  for (const c of cards) {
+    const list = bySid.get(c.sid);
+    if (list) list.push(c);
+    else bySid.set(c.sid, [c]);
+  }
+  const ids = [...bySid.keys()];
   for (let i = 0; i < ids.length; i += 75) {
     const batch = ids.slice(i, i + 75).map((id) => ({ id }));
     const json = await fetchWithRetry('https://api.scryfall.com/cards/collection', {
@@ -493,10 +499,10 @@ async function refreshScryfall(cards) {
       headers: { 'Content-Type': 'application/json' },
     });
     for (const c of json.data ?? []) {
-      const card = byId.get(c.id);
-      if (!card) continue;
-      const fresh = cardFromScryfall(c, card.finish);
-      Object.assign(card, fresh, { urls: { ...card.urls, ...fresh.urls } });
+      for (const card of bySid.get(c.id) ?? []) {
+        const fresh = cardFromScryfall(c, card.finish);
+        Object.assign(card, fresh, { urls: { ...card.urls, ...fresh.urls } });
+      }
     }
     for (const nf of json.not_found ?? []) {
       warnings.push(`Scryfall: カードが見つかりませんでした: ${nf.id}`);
