@@ -3,6 +3,7 @@ import './App.css';
 import { MarketChart } from './components/MarketChart';
 import { UpdateButton } from './components/UpdateButton';
 import { WatchlistPanel } from './components/WatchlistPanel';
+import { computeOmens } from './lib/omen';
 import { computeSpikes } from './lib/spike';
 import { formatJpy, formatPct, formatUsd } from './lib/format';
 import {
@@ -115,6 +116,8 @@ const MAX_ROWS = 500;
 const SPIKE_MAX = 20;
 /** 急落検知の最大表示枚数 */
 const DROP_MAX = 10;
+/** 予兆パネルの最大表示枚数 */
+const OMEN_MAX = 12;
 
 export default function App() {
   const [catalog, setCatalog] = useState<WatchCatalog | null>(null);
@@ -194,6 +197,17 @@ export default function App() {
     () => (catalog ? computeSpikes(catalog.cards, tcg, history) : null),
     [catalog, tcg, history],
   );
+
+  /** スパイク前段の先行指標（予兆） */
+  const omens = useMemo(() => {
+    if (!catalog || !spikeResult) return [];
+    return computeOmens(
+      catalog.cards,
+      tcg,
+      history,
+      new Set(spikeResult.ups.map((s) => s.card.id)),
+    );
+  }, [catalog, tcg, history, spikeResult]);
 
   /** 急上昇チップのクリック: フィルタを解除してその行を展開・スクロール */
   const jumpToCard = (id: string) => {
@@ -428,6 +442,44 @@ export default function App() {
               </section>
             ),
         )}
+
+      {omens.length > 0 && (
+        <section className="panel">
+          <h2 className="panel__title">
+            予兆（スパイク前段の先行指標・候補{omens.length}枚）
+          </h2>
+          <div className="watch-surge-list">
+            {omens.slice(0, OMEN_MAX).map((o) => (
+              <button
+                key={o.card.id}
+                type="button"
+                className="watch-surge-chip"
+                title="クリックで履歴チャートを表示"
+                onClick={() => jumpToCard(o.card.id)}
+              >
+                {o.card.img && <img src={o.card.img} alt="" loading="lazy" />}
+                <span className="watch-surge-chip__body">
+                  <span className="watch-surge-chip__name">{o.card.name}</span>
+                  <span className="watch-surge-chip__sub">
+                    {o.card.set.toUpperCase()} #{o.card.cn}
+                    {o.card.finish !== 'nonfoil' && ' Foil'}
+                    {o.recentUsd != null && ` / ${formatUsd(o.recentUsd)}`}
+                  </span>
+                  {o.signals.map((s) => (
+                    <span key={s.type} className="watch-omen-signal">
+                      {s.label}
+                    </span>
+                  ))}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="watch-surge-more">
+            出来高先行・在庫枯渇・波及前（TCG→晴れる屋）・CK買取先行・EDHREC急上昇・
+            下値切り上げの6指標。価格がまだ大きく動いていない段階の兆候なので外れもあります
+          </p>
+        </section>
+      )}
 
       <WatchlistPanel trackedIds={new Set(catalog.cards.map((c) => c.id))} />
 

@@ -397,6 +397,8 @@ function cardFromScryfall(c, finish) {
     tid: c.tcgplayer_id ?? null,
     // スパイク検知の「新セット除外」に使う発売日
     released: c.released_at ?? null,
+    // EDH人気順位（小さいほど人気）。予兆検知の需要モメンタムに使う
+    edhrec: c.edhrec_rank ?? null,
     // Double Rainbow Foil（シリアル入り）。晴れる屋の商品照合で参照先の区別に使う
     ...(c.promo_types?.includes('doublerainbow') && { dr: true }),
     // ジャッジ褒賞プロモ。晴れる屋では [ジャッジ褒賞]/[Judge Foil] 表記のため特別照合する
@@ -579,7 +581,16 @@ function pickTcgSku(result, foil) {
     for (const b of sku.buckets ?? []) {
       const price = toNum(b.marketPrice);
       if (price == null || price === 0 || !b.bucketStartDate) continue;
-      buckets[b.bucketStartDate] = [price, Number(b.quantitySold) || 0, Number(b.transactionCount) || 0];
+      // [マーケットプライス, 販売枚数, 取引数, 安値, 高値]
+      // 安値/高値は実売があった期間のみ >0（予兆検知の「下値切り上げ」に使う。
+      // 2026-07-26以前のバケットは3要素）
+      buckets[b.bucketStartDate] = [
+        price,
+        Number(b.quantitySold) || 0,
+        Number(b.transactionCount) || 0,
+        toNum(b.lowSalePrice) ?? 0,
+        toNum(b.highSalePrice) ?? 0,
+      ];
     }
     if (Object.keys(buckets).length > 0) {
       return { condition: sku.condition, skuId: sku.skuId, buckets };
@@ -877,7 +888,9 @@ async function updateHistory(cards) {
   const date = todayJst();
   const prices = {};
   for (const c of cards) {
-    // [晴れる屋買取JPY, 晴れる屋販売JPY, CK販売USD, TCGマーケットUSD, Cardmarket EUR, 晴れる屋在庫, CK在庫]
+    // [晴れる屋買取JPY, 晴れる屋販売JPY, CK販売USD, TCGマーケットUSD, Cardmarket EUR,
+    //  晴れる屋在庫, CK在庫, CK買取USD, EDHRECランク]
+    // 末尾2つは予兆検知（買取先行・需要モメンタム）用。2026-07-26以前には存在しない
     prices[c.id] = [
       c.hyBuyJpy ?? null,
       c.hyJpy ?? null,
@@ -886,6 +899,8 @@ async function updateHistory(cards) {
       c.cmEur ?? null,
       c.hyStock ?? 0,
       c.ckQty ?? 0,
+      c.ckBuylistUsd ?? null,
+      c.edhrec ?? null,
     ];
   }
   history.snapshots = history.snapshots.filter((s) => s.date !== date);

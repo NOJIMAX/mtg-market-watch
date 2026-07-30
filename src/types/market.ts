@@ -22,6 +22,8 @@ export interface WatchCard {
   judge?: boolean;
   /** 手動監視リスト (data/manual-watchlist.json) による追跡 */
   manual?: boolean;
+  /** EDH人気順位（小さいほど人気）。2026-07-26以前のデータには存在しない */
+  edhrec?: number | null;
   firstTracked: string;
   /** 晴れる屋側のセットコード（買取行由来） */
   hySetCode: string;
@@ -83,7 +85,11 @@ export interface WatchCatalog {
   cards: WatchCard[];
 }
 
-/** [晴れる屋買取JPY, 晴れる屋販売JPY, CK販売USD, TCGマーケットUSD, Cardmarket EUR, 晴れる屋在庫, CK在庫] */
+/**
+ * [晴れる屋買取JPY, 晴れる屋販売JPY, CK販売USD, TCGマーケットUSD, Cardmarket EUR,
+ *  晴れる屋在庫, CK在庫, CK買取USD?, EDHRECランク?]
+ * 末尾2つは2026-07-26以前のスナップショットには存在しない
+ */
 export type PriceTuple = [
   number | null,
   number | null,
@@ -92,6 +98,8 @@ export type PriceTuple = [
   number | null,
   number,
   number,
+  (number | null)?,
+  (number | null)?,
 ];
 
 export interface WatchSnapshot {
@@ -103,11 +111,15 @@ export interface WatchHistory {
   snapshots: WatchSnapshot[];
 }
 
-/** TCGplayer マーケットプライス履歴。バケットは 日付 → [価格USD, 販売数, 取引数] */
+/**
+ * TCGplayer マーケットプライス履歴。
+ * バケットは 日付 → [価格USD, 販売数, 取引数, 安値?, 高値?]
+ * （安値/高値は2026-07-26以前のバケットには存在しない）
+ */
 export interface TcgCardHistory {
   tid: number;
   condition: string | null;
-  buckets: Record<string, [number, number, number]>;
+  buckets: Record<string, [number, number, number, number?, number?]>;
 }
 
 export type TcgHistoryMap = Record<string, TcgCardHistory>;

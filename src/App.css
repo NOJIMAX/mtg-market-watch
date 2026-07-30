@@ -1002,3 +1002,17 @@
 .watch-drop {
   color: #b91c1c;
 }
+
+/* ==== 予兆シグナル ==== */
+
+.watch-omen-signal {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: #fef9c3;
+  color: #854d0e;
+  font-size: 11px;
+  line-height: 1.5;
+  width: fit-content;
+}
