@@ -743,6 +743,20 @@ export default function App() {
                               )}
                             </>
                           )}
+                          {src.key === 'tp' && card.tpLowUsd != null && (
+                            <span
+                              className="tracker-cell-sub tracker-listing"
+                              title="現在のNM英語版出品の最安値（本体価格）と出品数。マーケットプライスは実売の平滑平均のため、今買える値段はこちらを参照"
+                            >
+                              最安出品{' '}
+                              {showJpy
+                                ? formatJpy(toJpy(card.tpLowUsd, 'USD', rates))
+                                : formatNative(card.tpLowUsd, 'USD')}
+                              {card.tpListings != null &&
+                                card.tpListings > 0 &&
+                                `・${card.tpListings}件`}
+                            </span>
+                          )}
                         </td>
                       );
                     })}

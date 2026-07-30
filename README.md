@@ -77,6 +77,7 @@ UI では緑の「手動」バッジ。手動監視のカードは価格しき�
 | --- | --- |
 | 版の特定 | Scryfall（セットコード + コレクター番号 → `tcgplayer_id` 等。結果は `data/resolve-cache.json` にキャッシュ） |
 | TCGplayer 市場価格履歴 | `infinite-api.tcgplayer.com/price/history/{productId}/detailed`。英語・追跡仕上げ・最良状態（NM優先）のSKUのマーケットプライス。初回は annual（週次・1年分）、以降は month（日次・30日分）を取得して日付単位でマージ蓄積 |
+| TCGplayer 出品情報 | `mp-search-api` の listings から NM・英語・追跡仕上げの通常出品の**最安値（本体価格）と出品数**を毎日取得。マーケットプライスは実売の平滑平均で遅行するため「今買える値段」の参考としてTCG列に併記（予兆の出品枯渇シグナルにも使用） |
 | 晴れる屋 販売 (JPY) | `unisearch_api` のカード名検索（`kw=`）→ セット・Foil・番号で商品を特定 → 商品ページの状態別在庫から「在庫のある最良状態（NM優先）の最安値」。他ソースと言語を揃えるため**英語版の在庫のみ**参照（日本語版しか在庫がない場合は「在庫なし」扱い） |
 | Card Kingdom 販売 (USD) | 公開API `api.cardkingdom.com/api/pricelist` の `price_retail`（scryfall_id + Foil有無で照合） |
 | Cardmarket (EUR) | Scryfall `/cards/collection` の `prices.eur / eur_foil` |

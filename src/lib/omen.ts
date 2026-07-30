@@ -18,7 +18,14 @@ import type { TcgHistoryMap, WatchCard, WatchHistory } from '../types/market';
  *   - floor_lift:  実売の安値が切り上がっているのにマーケットプライスは横ばい
  */
 export interface OmenSignal {
-  type: 'vol_surge' | 'stock_drain' | 'spillover' | 'buy_ratio' | 'edhrec' | 'floor_lift';
+  type:
+    | 'vol_surge'
+    | 'stock_drain'
+    | 'spillover'
+    | 'buy_ratio'
+    | 'edhrec'
+    | 'floor_lift'
+    | 'listing_drain';
   label: string;
   weight: number;
 }
@@ -36,6 +43,7 @@ const NEW_SET_DAYS = 90;
 const WEIGHTS: Record<OmenSignal['type'], number> = {
   vol_surge: 30,
   buy_ratio: 25,
+  listing_drain: 25,
   stock_drain: 20,
   spillover: 20,
   floor_lift: 20,
@@ -179,6 +187,19 @@ export function computeOmens(
               type: 'buy_ratio',
               label: `CK買取+${(buyPct * 100).toFixed(0)}%（販売は${(retailPct * 100).toFixed(0)}%のまま）`,
               weight: WEIGHTS.buy_ratio,
+            });
+          }
+        }
+
+        // --- listing_drain: TCG出品枯渇（Tier B: 2026-07-27以降の蓄積で有効化） ---
+        const lisOld = oldT[10];
+        const lisNew = newT[10];
+        if (!spiked && priceQuiet && lisOld != null && lisNew != null) {
+          if (lisOld >= 5 && lisNew <= 4 && lisNew <= lisOld / 2) {
+            signals.push({
+              type: 'listing_drain',
+              label: `TCG出品 ${lisOld}件→${lisNew}件（価格は据え置き）`,
+              weight: WEIGHTS.listing_drain,
             });
           }
         }

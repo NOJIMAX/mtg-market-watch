@@ -24,6 +24,10 @@ export interface WatchCard {
   manual?: boolean;
   /** EDH人気順位（小さいほど人気）。2026-07-26以前のデータには存在しない */
   edhrec?: number | null;
+  /** TCGplayer NM出品の最安値（本体USD）。2026-07-27以前のデータには存在しない */
+  tpLowUsd?: number | null;
+  /** TCGplayer NM出品数 */
+  tpListings?: number | null;
   firstTracked: string;
   /** 晴れる屋側のセットコード（買取行由来） */
   hySetCode: string;
@@ -87,8 +91,8 @@ export interface WatchCatalog {
 
 /**
  * [晴れる屋買取JPY, 晴れる屋販売JPY, CK販売USD, TCGマーケットUSD, Cardmarket EUR,
- *  晴れる屋在庫, CK在庫, CK買取USD?, EDHRECランク?]
- * 末尾2つは2026-07-26以前のスナップショットには存在しない
+ *  晴れる屋在庫, CK在庫, CK買取USD?, EDHRECランク?, TCG最安出品USD?, TCG出品数?]
+ * 7,8は2026-07-26以前、9,10は2026-07-27以前のスナップショットには存在しない
  */
 export type PriceTuple = [
   number | null,
@@ -98,6 +102,8 @@ export type PriceTuple = [
   number | null,
   number,
   number,
+  (number | null)?,
+  (number | null)?,
   (number | null)?,
   (number | null)?,
 ];

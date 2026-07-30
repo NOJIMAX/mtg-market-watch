@@ -520,6 +520,61 @@ async function refreshScryfall(cards) {
   });
 }
 
+/* ================ TCGplayer（NM出品の最安値・出品数） ================ */
+
+const TCG_LISTINGS_API = 'https://mp-search-api.tcgplayer.com/v1/product';
+
+/** NM・英語・指定仕上げの通常出品を送料込み昇順で1件取得するリクエストボディ */
+const tcgListingsBody = (foil) =>
+  JSON.stringify({
+    filters: {
+      term: {
+        sellerStatus: 'Live',
+        channelId: 0,
+        language: ['English'],
+        condition: ['Near Mint'],
+        printing: [foil ? 'Foil' : 'Normal'],
+        listingType: 'standard',
+      },
+      range: { quantity: { gte: 1 } },
+      exclude: { channelExclusion: 0 },
+    },
+    from: 0,
+    size: 1,
+    sort: { field: 'price+shipping', order: 'asc' },
+    context: { shippingCountry: 'US', cart: {} },
+    aggregations: ['listingType'],
+  });
+
+/**
+ * 現在のNM出品の最安値（本体価格）と出品数を取得する。
+ * マーケットプライスは実売の平滑平均で遅行するため、「今買える値段」の
+ * 参考として並記する（予兆の出品枯渇シグナルにも使う）
+ */
+async function fetchTcgListings(cards) {
+  console.log('TCGplayer: NM出品の最安値・出品数を取得中...');
+  let priced = 0;
+  for (const card of cards) {
+    if (!card.tid) continue;
+    await sleep(DELAY_MS);
+    try {
+      const json = await fetchWithRetry(`${TCG_LISTINGS_API}/${card.tid}/listings`, {
+        method: 'POST',
+        body: tcgListingsBody(card.finish !== 'nonfoil'),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const result = json.results?.[0];
+      const cheapest = result?.results?.[0];
+      card.tpLowUsd = cheapest ? toNum(cheapest.price) : null;
+      card.tpListings = result?.totalResults ?? 0;
+      if (card.tpLowUsd != null) priced++;
+    } catch (err) {
+      warnings.push(`TCGplayer: 出品の取得に失敗しました: ${card.name} (${err.message})`);
+    }
+  }
+  console.log(`TCGplayer: ${priced}/${cards.length}枚にNM出品がありました`);
+}
+
 /* ================ Card Kingdom（販売価格） ================ */
 
 async function fetchCardKingdomRetail(cards) {
@@ -889,8 +944,8 @@ async function updateHistory(cards) {
   const prices = {};
   for (const c of cards) {
     // [晴れる屋買取JPY, 晴れる屋販売JPY, CK販売USD, TCGマーケットUSD, Cardmarket EUR,
-    //  晴れる屋在庫, CK在庫, CK買取USD, EDHRECランク]
-    // 末尾2つは予兆検知（買取先行・需要モメンタム）用。2026-07-26以前には存在しない
+    //  晴れる屋在庫, CK在庫, CK買取USD, EDHRECランク, TCG最安出品USD, TCG出品数]
+    // 末尾4つは予兆検知用。7,8は2026-07-26以前、9,10は2026-07-27以前には存在しない
     prices[c.id] = [
       c.hyBuyJpy ?? null,
       c.hyJpy ?? null,
@@ -901,6 +956,8 @@ async function updateHistory(cards) {
       c.ckQty ?? 0,
       c.ckBuylistUsd ?? null,
       c.edhrec ?? null,
+      c.tpLowUsd ?? null,
+      c.tpListings ?? null,
     ];
   }
   history.snapshots = history.snapshots.filter((s) => s.date !== date);
@@ -1120,6 +1177,7 @@ async function main() {
 
   const tcgHistory = (await readJson(join(OUT_DIR, 'tcg-history.json'))) ?? {};
   await fetchTcgHistories(trackedCards, tcgHistory);
+  await fetchTcgListings(trackedCards);
   // 追跡から外れたカード（除外セット等）の履歴エントリを掃除する
   const trackedIds = new Set(trackedCards.map((c) => c.id));
   for (const id of Object.keys(tcgHistory)) {
