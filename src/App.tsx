@@ -136,6 +136,8 @@ export default function App() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   /** インクリメントすると価格データを再読み込みする（手動更新の完了時） */
   const [reloadKey, setReloadKey] = useState(0);
+  /** 検知パネル（up/down/omen）ごとの「すべて表示」状態 */
+  const [showAll, setShowAll] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     (async () => {
@@ -386,7 +388,7 @@ export default function App() {
                   {title}・候補{list.length}枚）
                 </h2>
                 <div className="watch-surge-list">
-                  {list.slice(0, max).map((s) => (
+                  {list.slice(0, showAll[key] ? list.length : max).map((s) => (
                     <button
                       key={s.card.id}
                       type="button"
@@ -432,6 +434,15 @@ export default function App() {
                     </button>
                   ))}
                 </div>
+                {list.length > max && (
+                  <button
+                    type="button"
+                    className="watch-show-all"
+                    onClick={() => setShowAll((v) => ({ ...v, [key]: !v[key] }))}
+                  >
+                    {showAll[key] ? '上位だけに戻す' : `残り${list.length - max}枚をすべて表示`}
+                  </button>
+                )}
                 <p className="watch-surge-more">
                   条件: 直近14日に実売あり・{word === '上昇' ? '$10以上' : '下落前$10以上'}
                   ・変化額$5以上・{word}率10%以上（実売0のバケットと発売90日未満の新セット
@@ -449,7 +460,7 @@ export default function App() {
             予兆（スパイク前段の先行指標・候補{omens.length}枚）
           </h2>
           <div className="watch-surge-list">
-            {omens.slice(0, OMEN_MAX).map((o) => (
+            {omens.slice(0, showAll.omen ? omens.length : OMEN_MAX).map((o) => (
               <button
                 key={o.card.id}
                 type="button"
@@ -474,6 +485,15 @@ export default function App() {
               </button>
             ))}
           </div>
+          {omens.length > OMEN_MAX && (
+            <button
+              type="button"
+              className="watch-show-all"
+              onClick={() => setShowAll((v) => ({ ...v, omen: !v.omen }))}
+            >
+              {showAll.omen ? '上位だけに戻す' : `残り${omens.length - OMEN_MAX}枚をすべて表示`}
+            </button>
+          )}
           <p className="watch-surge-more">
             出来高先行・在庫枯渇・波及前（TCG→晴れる屋）・CK買取先行・EDHREC急上昇・
             下値切り上げの6指標。価格がまだ大きく動いていない段階の兆候なので外れもあります
