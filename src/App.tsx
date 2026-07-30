@@ -211,17 +211,30 @@ export default function App() {
     );
   }, [catalog, tcg, history, spikeResult]);
 
-  /** 急上昇チップのクリック: フィルタを解除してその行を展開・スクロール */
-  const jumpToCard = (id: string) => {
-    setSearchText('');
+  /**
+   * 検知チップのクリック: そのカード名でテーブルを絞り込んでから該当行を展開・スクロール。
+   * テーブルは描画上限（MAX_ROWS）があるため、絞り込まないと並び順下位のカードは
+   * 行自体が存在せず移動できない。絞り込むことで各サイトの価格確認もしやすくなる
+   */
+  const jumpToCard = (id: string, name: string) => {
+    setSearchText(name);
     setActiveOnly(false);
     setFoilFilter('all');
     setSetFilter('');
     setExpandedId(id);
-    // フィルタ解除後の再描画を待ってからスクロールする
-    requestAnimationFrame(() => {
-      document.getElementById(`row-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
+    // 絞り込みの再描画で行ノードが差し替わるとスクロールがキャンセルされるため、
+    // 行が実際に画面内へ来るまで少し粘る
+    let tries = 0;
+    const tryScroll = () => {
+      const el = document.getElementById(`row-${id}`);
+      if (el?.isConnected) {
+        el.scrollIntoView({ block: 'center' });
+        const r = el.getBoundingClientRect();
+        if (r.top > 60 && r.top < window.innerHeight - 80) return;
+      }
+      if (++tries < 15) setTimeout(tryScroll, 120);
+    };
+    setTimeout(tryScroll, 150);
   };
 
   const rows = useMemo(() => {
@@ -394,7 +407,7 @@ export default function App() {
                       type="button"
                       className="watch-surge-chip"
                       title="基準値 = 過去30日の実売中央値 / クリックで履歴チャートを表示"
-                      onClick={() => jumpToCard(s.card.id)}
+                      onClick={() => jumpToCard(s.card.id, s.card.name)}
                     >
                       {s.card.img && <img src={s.card.img} alt="" loading="lazy" />}
                       <span className="watch-surge-chip__body">
@@ -466,7 +479,7 @@ export default function App() {
                 type="button"
                 className="watch-surge-chip"
                 title="クリックで履歴チャートを表示"
-                onClick={() => jumpToCard(o.card.id)}
+                onClick={() => jumpToCard(o.card.id, o.card.name)}
               >
                 {o.card.img && <img src={o.card.img} alt="" loading="lazy" />}
                 <span className="watch-surge-chip__body">
