@@ -82,6 +82,17 @@ const DEFAULT_INCLUDED_SETS = [
   { query: 'is:judgegift', label: 'judge', minUsd: 20 }, // ジャッジ褒賞Foil（日英価格差の監視）
   // LTRホリデーリリース（独立セットではなく ltr の 2023-11-03 追加分 #452〜）
   { query: 'e:ltr date>=2023-11-01', label: 'ltr-holiday', minUsd: 20 },
+  // 初音ミク Secret Lair（しきい値なしで全カード追跡）:
+  //   1) Taggerのアートタグ = 既存コラボ全波 (#804-808, #1585-1607)。新ドロップも
+  //      タグ整備され次第自動で入る
+  //   2) 2026-08-10発売 = Secret Lair統率者デッキ「Hatsune Miku」の新アート
+  //   3) キャラ名入りフレーバーネーム = タグ未整備の新ドロップの取りこぼし防止
+  { query: 'e:sld atag:vocaloid', label: 'miku' },
+  { query: 'e:sld date=2026-08-10', label: 'miku-cmd' },
+  {
+    query: 'e:sld has:flavorname (miku or kagamine or megurine or kaito or meiko)',
+    label: 'miku-fn',
+  },
 ];
 
 const INCLUDED_SETS = process.env.INCLUDED_SETS
