@@ -65,6 +65,8 @@ const EXCLUDED_SETS = new Set(
  * セット単位の監視リストのデフォルト。ヒット判定と無関係に常に追跡する。
  *   code:   Scryfall セットコード（セット全カードが対象）
  *   query:  Scryfall 検索クエリ（セット横断の特殊仕上げ等。label はログ・警告表示用）
+ *   group:  UIの「カテゴリ」フィルタでまとめる名前（省略時は label / code）。
+ *           複数エントリに同じ group を付けると1カテゴリに束ねられる
  *   minUsd: Scryfall 参考価格(USD)がこの値以上のカードだけを対象にする。
  *           条件から外れたカードは次回実行時にカタログからも外れる
  *           （再び条件を満たせば TCGplayer 履歴は過去1年分を取り直せる）
@@ -87,11 +89,12 @@ const DEFAULT_INCLUDED_SETS = [
   //      タグ整備され次第自動で入る
   //   2) 2026-08-10発売 = Secret Lair統率者デッキ「Hatsune Miku」の新アート
   //   3) キャラ名入りフレーバーネーム = タグ未整備の新ドロップの取りこぼし防止
-  { query: 'e:sld atag:vocaloid', label: 'miku' },
-  { query: 'e:sld date=2026-08-10', label: 'miku-cmd' },
+  { query: 'e:sld atag:vocaloid', label: 'miku', group: 'miku' },
+  { query: 'e:sld date=2026-08-10', label: 'miku-cmd', group: 'miku' },
   {
     query: 'e:sld has:flavorname (miku or kagamine or megurine or kaito or meiko)',
     label: 'miku-fn',
+    group: 'miku',
   },
 ];
 
@@ -428,9 +431,16 @@ function cardFromScryfall(c, finish) {
  * Scryfall 参考価格で選別する。既にヒットとして追跡中のカードには
  * watchSet フラグだけ付ける。
  */
+/** カードに監視カテゴリを記録する（UIのカテゴリフィルタ用） */
+function addGroup(card, group) {
+  card.groups ??= [];
+  if (!card.groups.includes(group)) card.groups.push(group);
+}
+
 async function addWatchedSets(cards, prevCards) {
-  for (const { code, query, label, minUsd } of INCLUDED_SETS) {
+  for (const { code, query, label, minUsd, group } of INCLUDED_SETS) {
     const name = label ?? code;
+    const groupName = group ?? name;
     if (code && EXCLUDED_SETS.has(code)) {
       warnings.push(`セット監視: ${code} は EXCLUDED_SETS に含まれるためスキップします`);
       continue;
@@ -455,6 +465,7 @@ async function addWatchedSets(cards, prevCards) {
           const existing = cards.get(id);
           if (existing) {
             existing.watchSet = true;
+            addGroup(existing, groupName);
             continue;
           }
           const refUsd = toNum(
@@ -469,6 +480,7 @@ async function addWatchedSets(cards, prevCards) {
             finish,
             active: false,
             watchSet: true,
+            groups: [groupName],
             firstTracked: prevCards.get(id)?.firstTracked ?? todayJst(),
             language: 'English',
             hyBuyJpy: null,
@@ -1095,6 +1107,7 @@ async function main() {
     const existing = cards.get(id);
     if (existing) {
       existing.manual = true;
+      addGroup(existing, 'manual');
       continue;
     }
     cards.set(id, {
@@ -1103,6 +1116,7 @@ async function main() {
       finish: m.finish,
       urls: {},
       manual: true,
+      groups: ['manual'],
       active: false,
       firstTracked: prevCards.get(id)?.firstTracked ?? todayJst(),
       language: 'English',
@@ -1148,6 +1162,7 @@ async function main() {
       // セット監視・手動監視から外れた場合はフラグを落とす（監視中ならこのループに来ない）
       watchSet: false,
       manual: false,
+      groups: undefined,
       // 買取価格・利益はヒット外でも照合できた場合のみ更新する
       ...(stale && {
         hyBuyJpy: stale.jp.hareruyaBuyPriceJPY,

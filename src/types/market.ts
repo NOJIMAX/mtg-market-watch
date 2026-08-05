@@ -22,6 +22,8 @@ export interface WatchCard {
   judge?: boolean;
   /** 手動監視リスト (data/manual-watchlist.json) による追跡 */
   manual?: boolean;
+  /** 監視カテゴリ（INCLUDED_SETS の group / label、手動は 'manual'）。2026-07-27以前には存在しない */
+  groups?: string[];
   /** EDH人気順位（小さいほど人気）。2026-07-26以前のデータには存在しない */
   edhrec?: number | null;
   /** TCGplayer NM出品の最安値（本体USD）。2026-07-27以前のデータには存在しない */

@@ -119,6 +119,16 @@ const DROP_MAX = 10;
 /** 予兆パネルの最大表示枚数 */
 const OMEN_MAX = 12;
 
+/** 監視カテゴリの表示名（未定義はコードを大文字表示） */
+const GROUP_LABELS: Record<string, string> = {
+  miku: '初音ミク',
+  doublerainbow: 'ダブルレインボウ',
+  judge: 'ジャッジ褒賞',
+  'ltr-holiday': 'LTRホリデー',
+  manual: '手動監視',
+  sld: 'Secret Lair ($30+)',
+};
+
 export default function App() {
   const [catalog, setCatalog] = useState<WatchCatalog | null>(null);
   const [history, setHistory] = useState<WatchHistory | null>(null);
@@ -131,6 +141,8 @@ export default function App() {
   const [foilFilter, setFoilFilter] = useState<'all' | 'foil' | 'nonfoil'>('all');
   /** 空文字 = 全セット */
   const [setFilter, setSetFilter] = useState('');
+  /** 空文字 = 全カテゴリ（監視グループ） */
+  const [groupFilter, setGroupFilter] = useState('');
   const [sortKey, setSortKey] = useState<WatchSortKey>('netProfit');
   const [showJpy, setShowJpy] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -182,6 +194,16 @@ export default function App() {
 
   const changes = useMemo(() => buildChanges(history), [history]);
 
+  /** 監視カテゴリの選択肢（枚数の多い順） */
+  const groupOptions = useMemo(() => {
+    if (!catalog) return [];
+    const counts = new Map<string, number>();
+    for (const c of catalog.cards) {
+      for (const g of c.groups ?? []) counts.set(g, (counts.get(g) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [catalog]);
+
   /** 追跡中カードに存在するセットの選択肢（枚数の多い順） */
   const setOptions = useMemo(() => {
     if (!catalog) return [];
@@ -221,6 +243,7 @@ export default function App() {
     setActiveOnly(false);
     setFoilFilter('all');
     setSetFilter('');
+    setGroupFilter('');
     setExpandedId(id);
     // 絞り込みの再描画で行ノードが差し替わるとスクロールがキャンセルされるため、
     // 行が実際に画面内へ来るまで少し粘る
@@ -244,6 +267,7 @@ export default function App() {
       if (activeOnly && !c.active && !c.watchSet && !c.manual) return false;
       if (foilFilter !== 'all' && (c.finish !== 'nonfoil') !== (foilFilter === 'foil')) return false;
       if (setFilter && c.set !== setFilter) return false;
+      if (groupFilter && !(c.groups ?? []).includes(groupFilter)) return false;
       if (search && !`${c.name} ${c.setName} ${c.set}`.toLowerCase().includes(search)) return false;
       return true;
     });
@@ -299,7 +323,7 @@ export default function App() {
         break;
     }
     return sorted;
-  }, [catalog, searchText, activeOnly, foilFilter, setFilter, sortKey, tcg, rates]);
+  }, [catalog, searchText, activeOnly, foilFilter, setFilter, groupFilter, sortKey, tcg, rates]);
 
   if (loading) {
     return (
@@ -527,6 +551,19 @@ export default function App() {
               onChange={(e) => setSearchText(e.target.value)}
             />
           </label>
+          {groupOptions.length > 0 && (
+            <label className="field">
+              <span className="field__label">カテゴリ</span>
+              <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)}>
+                <option value="">すべて</option>
+                {groupOptions.map(([g, count]) => (
+                  <option key={g} value={g}>
+                    {GROUP_LABELS[g] ?? g.toUpperCase()}（{count}枚）
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="field">
             <span className="field__label">セット</span>
             <select value={setFilter} onChange={(e) => setSetFilter(e.target.value)}>
